@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net462;netstandard2.0;net6.0;net8.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    
+    <!-- NuGet Package Metadata -->
+    <PackageId>JsonToolkit.STJ</PackageId>
+    <PackageVersion>1.0.0</PackageVersion>
+    <Title>JsonToolkit.STJ</Title>
+    <Authors>JsonToolkit Contributors</Authors>
+    <Description>Drop-in helpers to address common pain points when working with System.Text.Json in .NET applications. Provides Newtonsoft.Json-like conveniences while maintaining System.Text.Json performance benefits.</Description>
+    <Summary>Enhanced System.Text.Json with Newtonsoft.Json-like convenience features</Summary>
+    <PackageTags>json;system.text.json;newtonsoft;serialization;deserialization;dotnet</PackageTags>
+    <PackageProjectUrl>https://github.com/jsontoolkit/jsontoolkit-stj</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jsontoolkit/jsontoolkit-stj</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Copyright>Copyright (c) JsonToolkit Contributors</Copyright>
+    <PackageReleaseNotes>Initial release with core JSON processing enhancements for System.Text.Json</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <!-- Conditional Compilation Symbols -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net462'">
+    <DefineConstants>$(DefineConstants);NET462</DefineConstants>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <DefineConstants>$(DefineConstants);NETSTANDARD2_0</DefineConstants>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net6.0'">
+    <DefineConstants>$(DefineConstants);NET6_0</DefineConstants>
+  </PropertyGroup>
+  
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <DefineConstants>$(DefineConstants);NET8_0</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Package Dependencies -->
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- .NET Framework specific dependencies -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <PackageReference Include="System.Buffers" Version="4.5.1" />
+  </ItemGroup>
+
+  <!-- .NET Standard 2.0 specific dependencies -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Memory" Version="4.5.5" />
+  </ItemGroup>
+
+</Project>
