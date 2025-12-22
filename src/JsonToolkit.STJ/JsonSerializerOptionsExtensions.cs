@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using JsonToolkit.STJ.Converters;
 
 namespace JsonToolkit.STJ
 {
@@ -96,12 +99,13 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
-        /// Adds a converter to the options with validation.
+        /// Adds a converter to the options with validation and precedence handling.
         /// </summary>
-        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <param name="options">The options to apply converters to.</param>
         /// <param name="converter">The converter to add.</param>
+        /// <param name="precedence">The precedence of the converter (higher values have higher precedence).</param>
         /// <returns>The enhanced JsonSerializerOptions instance.</returns>
-        public static JsonSerializerOptions AddConverter(this JsonSerializerOptions options, JsonConverter converter)
+        public static JsonSerializerOptions AddConverter(this JsonSerializerOptions options, JsonConverter converter, int precedence)
         {
             if (options == null)
                 throw new ArgumentNullException(nameof(options));
@@ -110,7 +114,39 @@ namespace JsonToolkit.STJ
 
             try
             {
-                options.Converters.Add(converter);
+                // Register with the converter registry for precedence handling
+                ConverterRegistry.RegisterConverter(converter, precedence);
+                
+                // Add to options - let the registry handle precedence
+                var targetType = GetConverterTargetType(converter);
+                if (targetType != null)
+                {
+                    // Remove any existing converters for this type
+                    var existingConverters = options.Converters
+                        .Where(c => GetConverterTargetType(c) == targetType)
+                        .ToList();
+                    
+                    foreach (var existing in existingConverters)
+                    {
+                        options.Converters.Remove(existing);
+                    }
+                    
+                    // Add all converters for this type from registry in precedence order
+                    var registeredConverters = ConverterRegistry.GetConvertersForType(targetType);
+                    foreach (var registeredConverter in registeredConverters)
+                    {
+                        if (!options.Converters.Contains(registeredConverter))
+                        {
+                            options.Converters.Add(registeredConverter);
+                        }
+                    }
+                }
+                else
+                {
+                    // If we can't determine the target type, just add it
+                    options.Converters.Add(converter);
+                }
+                
                 return options;
             }
             catch (Exception ex)
@@ -121,6 +157,17 @@ namespace JsonToolkit.STJ
                     operation: "AddConverter"
                 );
             }
+        }
+
+        /// <summary>
+        /// Adds a converter to the options with validation (default precedence).
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <param name="converter">The converter to add.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions AddConverter(this JsonSerializerOptions options, JsonConverter converter)
+        {
+            return AddConverter(options, converter, 0);
         }
 
         /// <summary>
@@ -181,6 +228,111 @@ namespace JsonToolkit.STJ
                     operation: "ValidateConfiguration"
                 );
             }
+        }
+
+        /// <summary>
+        /// Applies all registered converters from the ConverterRegistry to the options.
+        /// </summary>
+        /// <param name="options">The options to apply converters to.</param>
+        /// <param name="overrideExisting">Whether to override existing converters of the same type.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions ApplyRegisteredConverters(this JsonSerializerOptions options, bool overrideExisting = false)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            try
+            {
+                ConverterRegistry.ApplyConvertersToOptions(options, overrideExisting);
+                return options;
+            }
+            catch (Exception ex)
+            {
+                throw new JsonToolkitException(
+                    "Failed to apply registered converters to JsonSerializerOptions.",
+                    ex,
+                    operation: "ApplyRegisteredConverters"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Gets debugging information about converters in the options.
+        /// </summary>
+        /// <param name="options">The options to analyze.</param>
+        /// <returns>A string containing debugging information.</returns>
+        public static string GetConverterDebugInfo(this JsonSerializerOptions options)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            var analysis = ConverterDebugger.AnalyzeConverters(options);
+            var info = new List<string>
+            {
+                $"Total Converters: {analysis.TotalConverters}",
+                $"JsonToolkit.STJ Converters: {analysis.ToolkitConverters}",
+                $"System Converters: {analysis.SystemConverters}",
+                $"Conflicts: {analysis.Conflicts.Count}"
+            };
+
+            if (analysis.HasConflicts)
+            {
+                info.Add("");
+                info.Add("Conflicts:");
+                foreach (var conflict in analysis.Conflicts)
+                {
+                    info.Add($"  - {conflict.Message}");
+                }
+            }
+
+            info.Add("");
+            info.Add("Converters by Type:");
+            foreach (var kvp in analysis.ConvertersByType.OrderBy(k => k.Key.Name))
+            {
+                info.Add($"  {kvp.Key.Name}:");
+                foreach (var converter in kvp.Value)
+                {
+                    var details = ConverterDebugger.GetConverterDetails(converter);
+                    info.Add($"    - {details.DebugInfo}");
+                }
+            }
+
+            return string.Join(Environment.NewLine, info);
+        }
+
+        private static Type? GetConverterTargetType(JsonConverter converter)
+        {
+            var converterType = converter.GetType();
+            
+            while (converterType != null && converterType != typeof(object))
+            {
+                if (converterType.IsGenericType)
+                {
+                    var genericTypeDef = converterType.GetGenericTypeDefinition();
+                    if (genericTypeDef == typeof(JsonConverter<>) ||
+                        genericTypeDef == typeof(SimpleJsonConverter<>) ||
+                        genericTypeDef == typeof(ReadOnlyJsonConverter<>) ||
+                        genericTypeDef == typeof(WriteOnlyJsonConverter<>))
+                    {
+                        return converterType.GetGenericArguments()[0];
+                    }
+                }
+                
+                converterType = converterType.BaseType;
+            }
+
+            return null;
+        }
+
+        private static int GetConverterPrecedence(JsonConverter converter)
+        {
+            return converter switch
+            {
+                SimpleJsonConverter<object> simple => simple.Precedence,
+                ReadOnlyJsonConverter<object> readOnly => readOnly.Precedence,
+                WriteOnlyJsonConverter<object> writeOnly => writeOnly.Precedence,
+                _ => 0
+            };
         }
     }
 }
