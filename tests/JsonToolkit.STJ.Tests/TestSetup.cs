@@ -12,6 +12,8 @@ namespace JsonToolkit.STJ.Tests
         {
             // Register custom generators for property-based testing
             Arb.Register<JsonObjectGen>();
+            Arb.Register<JsonDocumentGen>();
+            Arb.Register<ValidPatchGen>();
         }
     }
 }
