@@ -321,6 +321,95 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Performs a deep merge of two objects through JSON serialization with enhanced error handling.
+        /// </summary>
+        /// <typeparam name="T">The type of the objects to merge.</typeparam>
+        /// <param name="target">The target object to merge into.</param>
+        /// <param name="source">The source object to merge from.</param>
+        /// <param name="options">Options to control serialization behavior.</param>
+        /// <returns>A new object of type T containing the merged result.</returns>
+        /// <exception cref="JsonToolkitException">Thrown when merge operation fails with enhanced context.</exception>
+        public static T DeepMerge<T>(T target, T source, JsonSerializerOptions? options = null)
+        {
+            try
+            {
+                return JsonMerge.DeepMerge(target, source, options);
+            }
+            catch (JsonToolkitException)
+            {
+                // Re-throw JsonToolkitException as-is
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new JsonToolkitException(
+                    $"Failed to perform deep merge operation on objects of type '{typeof(T).Name}'.",
+                    ex,
+                    operation: "DeepMerge"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Performs a deep merge of multiple objects through JSON serialization with enhanced error handling.
+        /// </summary>
+        /// <typeparam name="T">The type of the objects to merge.</typeparam>
+        /// <param name="options">Options to control serialization behavior.</param>
+        /// <param name="sources">The objects to merge, in order of precedence.</param>
+        /// <returns>A new object of type T containing the merged result.</returns>
+        /// <exception cref="ArgumentException">Thrown when no sources are provided.</exception>
+        /// <exception cref="JsonToolkitException">Thrown when merge operation fails with enhanced context.</exception>
+        public static T DeepMerge<T>(JsonSerializerOptions? options, params T[] sources)
+        {
+            try
+            {
+                return JsonMerge.DeepMerge(options, sources);
+            }
+            catch (JsonToolkitException)
+            {
+                // Re-throw JsonToolkitException as-is
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new JsonToolkitException(
+                    $"Failed to perform deep merge operation on multiple objects of type '{typeof(T).Name}'.",
+                    ex,
+                    operation: "DeepMerge"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Performs a deep merge of multiple objects through JSON serialization with enhanced error handling using default options.
+        /// </summary>
+        /// <typeparam name="T">The type of the objects to merge.</typeparam>
+        /// <param name="sources">The objects to merge, in order of precedence.</param>
+        /// <returns>A new object of type T containing the merged result.</returns>
+        /// <exception cref="ArgumentException">Thrown when no sources are provided.</exception>
+        /// <exception cref="JsonToolkitException">Thrown when merge operation fails with enhanced context.</exception>
+        public static T DeepMerge<T>(params T[] sources)
+        {
+            try
+            {
+                return JsonMerge.DeepMerge(sources);
+            }
+            catch (JsonToolkitException)
+            {
+                // Re-throw JsonToolkitException as-is
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new JsonToolkitException(
+                    $"Failed to perform deep merge operation on multiple objects of type '{typeof(T).Name}'.",
+                    ex,
+                    operation: "DeepMerge"
+                );
+            }
+        }
+
+        /// <summary>
         /// Extracts property path information from a JsonException.
         /// </summary>
         /// <param name="ex">The JsonException to extract information from.</param>

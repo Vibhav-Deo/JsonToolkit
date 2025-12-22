@@ -21,6 +21,20 @@ Drop-in helpers to address common pain points when working with System.Text.Json
 dotnet add package JsonToolkit.STJ
 ```
 
+## Comparison Matrix
+
+| Feature | System.Text.Json | Newtonsoft.Json | **JsonToolkit.STJ** |
+|---------|------------------|-----------------|-------------------|
+| **Performance** | ✅ Excellent | ❌ Slower | ✅ **Excellent** |
+| **Memory Efficiency** | ✅ Low allocation | ❌ Higher allocation | ✅ **Low allocation** |
+| **Convenience APIs** | ❌ Verbose | ✅ Convenient | ✅ **Both styles** |
+| **Deep Merge** | ❌ Manual | ❌ Manual | ✅ **Built-in** |
+| **JSON Patch** | ❌ No | ❌ No | ✅ **RFC 6902** |
+| **JsonPath** | ❌ No | ✅ Limited | ✅ **Full support** |
+| **Case-Insensitive** | ⚠️ Manual config | ✅ Default | ✅ **Smart default** |
+| **Modern C#** | ⚠️ Limited | ❌ Poor | ✅ **Excellent** |
+| **Multi-Framework** | ⚠️ NuGet only | ✅ Native | ✅ **Optimized** |
+
 ## Quick Start
 
 ```csharp
