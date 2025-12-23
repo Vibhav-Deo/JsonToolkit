@@ -10,7 +10,7 @@ namespace JsonToolkit.STJ.Tests.Properties
 {
     public class ConfigurationMergeProperties
     {
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationMerge_MultipleConfigs_LastWins(string key, string value1, string value2)
         {
             return (IsValidJsonPropertyName(key) && value1 != null && value2 != null).ToProperty().And(() =>
@@ -26,7 +26,7 @@ namespace JsonToolkit.STJ.Tests.Properties
             });
         }
 
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationMerge_NestedObjects_DeepMerges(string key1, string key2, string value1, string value2)
         {
             return (IsValidJsonPropertyName(key1) && IsValidJsonPropertyName(key2) && 
@@ -46,7 +46,7 @@ namespace JsonToolkit.STJ.Tests.Properties
             });
         }
 
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationMerge_EmptyConfig_ReturnsOther(string key, string value)
         {
             return (IsValidJsonPropertyName(key) && value != null).ToProperty().And(() =>
@@ -67,7 +67,7 @@ namespace JsonToolkit.STJ.Tests.Properties
             });
         }
 
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationBuilder_WithFallback_AppliesWhenMissing(string key, string fallbackValue)
         {
             return (IsValidJsonPropertyName(key) && fallbackValue != null).ToProperty().And(() =>
@@ -84,7 +84,7 @@ namespace JsonToolkit.STJ.Tests.Properties
             });
         }
 
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationBuilder_WithFallback_DoesNotOverrideExisting(string key, string existingValue, string fallbackValue)
         {
             return (IsValidJsonPropertyName(key) && existingValue != null && 
@@ -103,7 +103,7 @@ namespace JsonToolkit.STJ.Tests.Properties
             });
         }
 
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationBuilder_MaskSensitiveData_ReplacesValue(string key, string sensitiveValue)
         {
             return (IsValidJsonPropertyName(key) && sensitiveValue != null).ToProperty().And(() =>
@@ -121,7 +121,7 @@ namespace JsonToolkit.STJ.Tests.Properties
             });
         }
 
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationMerge_ArraysReplaced_NotMerged(int[] array1, int[] array2)
         {
             return (array1 != null && array2 != null && array1.Length > 0 && array2.Length > 0).ToProperty().And(() =>
@@ -140,7 +140,7 @@ namespace JsonToolkit.STJ.Tests.Properties
             });
         }
 
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationMerge_NullOverwrites_ExistingValue(string key)
         {
             return IsValidJsonPropertyName(key).ToProperty().And(() =>
@@ -156,7 +156,7 @@ namespace JsonToolkit.STJ.Tests.Properties
             });
         }
 
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationBuilder_MultipleConfigs_MergesInOrder(string key1, string key2, string value1, string value2)
         {
             return (IsValidJsonPropertyName(key1) && IsValidJsonPropertyName(key2) && 
@@ -179,7 +179,7 @@ namespace JsonToolkit.STJ.Tests.Properties
             });
         }
 
-        [Property(Arbitrary = new[] { typeof(JsonGenerators) })]
+        [Property]
         public Property ConfigurationMerge_DifferentTypes_SecondWins(string key, int intValue, string strValue)
         {
             return (IsValidJsonPropertyName(key) && strValue != null).ToProperty().And(() =>
