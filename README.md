@@ -17,13 +17,15 @@
 - **🎯 Enhanced Null Handling**: Distinguish between missing properties, null values, and defaults
 - **🔍 JsonPath Queries**: Query JSON documents using JsonPath expressions with wildcards and filters
 - **🔗 LINQ-to-JSON**: Familiar LINQ operations for querying and transforming JSON data
-- **✅ JSON Schema Validation**: Comprehensive validation with detailed error reporting
-- **📋 Configuration Support**: Specialized helpers for appsettings.json scenarios
-- **🔄 Object Transformation**: Map between different object shapes through JSON
-- **🏷️ Validation Attributes**: Declarative validation with custom attributes
+- **✅ JSON Schema Validation**: Comprehensive validation with detailed error reporting using JSON Schema
+- **🔄 Object Transformation**: Map between different object shapes through JSON with JsonMapper
+- **🏷️ Validation Attributes**: Declarative validation with custom attributes (JsonRange, JsonLength, JsonPattern)
 - **🆕 Modern C# Support**: Records, init-only properties, required properties, immutable collections
 - **🔧 Extension Methods**: Newtonsoft.Json-style convenience methods (ToJson, FromJson, DeepClone)
 - **📊 Dynamic Access**: JElement class for JObject-like functionality
+- **⚡ Enhanced Error Handling**: Better error messages and context information
+- **⚖️ JSON Equality**: Semantic JSON comparison ignoring formatting and property order
+- **📋 Configuration Support**: Specialized helpers for appsettings.json scenarios
 - **🎯 Multi-Framework**: .NET Framework 4.6.2+, .NET Standard 2.0, .NET 6.0+, .NET 9.0
 
 ## 📦 Installation
@@ -38,6 +40,7 @@ dotnet add package JsonToolkit.STJ
 
 ```csharp
 using JsonToolkit.STJ;
+using JsonToolkit.STJ.Extensions;
 
 // Newtonsoft.Json-style extensions
 var json = myObject.ToJson();
@@ -45,13 +48,16 @@ var obj = json.FromJson<MyType>();
 var cloned = myObject.DeepClone();
 
 // System.Text.Json-style enhanced methods
-var json = JsonSerializer.SerializeEnhanced(myObject, options);
-var obj = JsonSerializer.DeserializeEnhanced<MyType>(json, options);
+var json2 = JsonSerializer.SerializeEnhanced(myObject, options);
+var obj2 = JsonSerializer.DeserializeEnhanced<MyType>(json2, options);
 ```
 
 ### Deep Merge
 
 ```csharp
+using System.Text.Json;
+using JsonToolkit.STJ;
+
 var config1 = """{"database": {"host": "localhost", "port": 5432}}""";
 var config2 = """{"database": {"port": 3306, "ssl": true}}""";
 
@@ -65,6 +71,9 @@ var merged = JsonMerge.DeepMerge(
 ### JSON Patch
 
 ```csharp
+using System.Text.Json;
+using JsonToolkit.STJ;
+
 var document = JsonDocument.Parse("""{"name": "John", "age": 30}""");
 
 var patch = new JsonPatchDocument()
@@ -73,11 +82,15 @@ var patch = new JsonPatchDocument()
     .Test("/name", "John");
 
 var result = patch.ApplyTo(document.RootElement);
+// Result: {"name": "John", "age": 31, "email": "john@example.com"}
 ```
 
 ### JsonPath Queries
 
 ```csharp
+using System.Text.Json;
+using JsonToolkit.STJ;
+
 var json = """
 {
   "users": [
@@ -88,11 +101,80 @@ var json = """
 """;
 
 var adults = JsonPath.Query(JsonDocument.Parse(json).RootElement, "$.users[?(@.age >= 18)]");
+// Returns both users since both are 18 or older
+```
+
+### JSON Schema Validation
+
+```csharp
+using System.Text.Json;
+using JsonToolkit.STJ;
+
+var schema = """
+{
+  "type": "object",
+  "properties": {
+    "name": {"type": "string"},
+    "age": {"type": "number", "minimum": 0}
+  },
+  "required": ["name", "age"]
+}
+""";
+
+var validator = new JsonSchemaValidator(schema);
+var json = """{"name": "John", "age": 30}""";
+
+var result = validator.Validate(json);
+if (result.IsValid)
+{
+    Console.WriteLine("JSON is valid!");
+}
+else
+{
+    foreach (var error in result.Errors)
+    {
+        Console.WriteLine($"Error at {error.Path}: {error.Message}");
+    }
+}
+```
+
+### Object Mapping
+
+```csharp
+using JsonToolkit.STJ;
+
+// Define source and target types
+public class UserDto
+{
+    public string FullName { get; set; }
+    public int YearsOld { get; set; }
+}
+
+public class User
+{
+    public string Name { get; set; }
+    public int Age { get; set; }
+    public string DisplayName { get; set; }
+}
+
+// Configure mapping
+var mapper = JsonMapper.Create()
+    .Map<UserDto, User>(config => config
+        .ForMember(u => u.Name, dto => dto.FullName)
+        .ForMember(u => u.Age, dto => dto.YearsOld)
+        .ForMember(u => u.DisplayName, dto => $"User: {dto.FullName}"));
+
+// Transform objects
+var dto = new UserDto { FullName = "John Doe", YearsOld = 30 };
+var user = mapper.Transform<UserDto, User>(dto);
+// Result: User with Name="John Doe", Age=30, DisplayName="User: John Doe"
 ```
 
 ### Configuration with Fluent API
 
 ```csharp
+using JsonToolkit.STJ;
+
 var options = new JsonOptionsBuilder()
     .WithCaseInsensitiveProperties()
     .WithFlexibleEnums()
@@ -103,6 +185,152 @@ var options = new JsonOptionsBuilder()
         .MapType("dog", typeof(Dog))
         .MapType("cat", typeof(Cat)))
     .Build();
+
+// Use the configured options
+var json = JsonSerializer.Serialize(myObject, options);
+var obj = JsonSerializer.Deserialize<MyType>(json, options);
+```
+
+## 🌟 Real-World Examples
+
+### Configuration File Merging
+
+```csharp
+using System.Text.Json;
+using JsonToolkit.STJ;
+
+// Base configuration
+var baseConfig = """
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "timeout": 30
+  },
+  "logging": {
+    "level": "Information"
+  }
+}
+""";
+
+// Environment-specific overrides
+var prodConfig = """
+{
+  "database": {
+    "host": "prod-db.company.com",
+    "ssl": true
+  },
+  "logging": {
+    "level": "Warning"
+  }
+}
+""";
+
+// Merge configurations
+var merged = JsonMerge.DeepMerge(
+    JsonDocument.Parse(baseConfig).RootElement,
+    JsonDocument.Parse(prodConfig).RootElement
+);
+
+// Result: Combined configuration with production overrides
+// {
+//   "database": {
+//     "host": "prod-db.company.com",
+//     "port": 5432,
+//     "timeout": 30,
+//     "ssl": true
+//   },
+//   "logging": {
+//     "level": "Warning"
+//   }
+// }
+```
+
+### REST API Integration
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using JsonToolkit.STJ;
+using JsonToolkit.STJ.Extensions;
+
+[ApiController]
+[Route("api/[controller]")]
+public class UsersController : ControllerBase
+{
+    [HttpPost]
+    public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
+    {
+        try
+        {
+            // Validate the request using validation attributes
+            var validationResult = request.Validate();
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(validationResult.Errors);
+            }
+
+            // Transform DTO to domain model
+            var mapper = JsonMapper.Create();
+            var user = mapper.Transform<CreateUserRequest, User>(request);
+
+            // Save user (implementation omitted)
+            await SaveUserAsync(user);
+
+            // Return response
+            var response = new { Id = user.Id, Message = "User created successfully" };
+            return Ok(response.ToJson());
+        }
+        catch (JsonValidationException ex)
+        {
+            return BadRequest(new { Error = "Validation failed", Details = ex.Errors });
+        }
+    }
+}
+
+public class CreateUserRequest
+{
+    [JsonLength(2, 50)]
+    public string Name { get; set; }
+
+    [JsonPattern(@"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")]
+    public string Email { get; set; }
+
+    [JsonRange(18, 120)]
+    public int Age { get; set; }
+}
+```
+
+### Complex Data Transformation
+
+```csharp
+using JsonToolkit.STJ;
+using JsonToolkit.STJ.Extensions;
+
+// Transform complex nested data structures
+var sourceData = new
+{
+    customer = new
+    {
+        personal_info = new { first_name = "John", last_name = "Doe" },
+        contact = new { email = "john@example.com", phone = "555-1234" }
+    },
+    orders = new[]
+    {
+        new { id = 1, amount = 99.99, status = "completed" },
+        new { id = 2, amount = 149.50, status = "pending" }
+    }
+};
+
+// Configure transformation mapping
+var mapper = JsonMapper.Create()
+    .Map<dynamic, CustomerSummary>(config => config
+        .ForMember(c => c.FullName, src => $"{src.customer.personal_info.first_name} {src.customer.personal_info.last_name}")
+        .ForMember(c => c.Email, src => src.customer.contact.email)
+        .ForMember(c => c.TotalOrders, src => src.orders.Length)
+        .ForMember(c => c.TotalAmount, src => src.orders.Sum(o => o.amount)));
+
+var summary = mapper.Transform<dynamic, CustomerSummary>(sourceData);
+// Result: CustomerSummary with aggregated data
 ```
 
 ## 📚 Documentation
@@ -112,6 +340,8 @@ var options = new JsonOptionsBuilder()
 JsonToolkit.STJ provides familiar APIs to ease migration:
 
 ```csharp
+using JsonToolkit.STJ.Extensions;
+
 // Before (Newtonsoft.Json)
 var json = JsonConvert.SerializeObject(obj);
 var obj = JsonConvert.DeserializeObject<MyType>(json);
@@ -130,6 +360,9 @@ var value = jelem["property"]["nested"].Value<string>();
 #### Polymorphic Deserialization
 
 ```csharp
+using JsonToolkit.STJ;
+using JsonToolkit.STJ.Extensions;
+
 public abstract class Shape
 {
     public string Color { get; set; }
@@ -161,6 +394,10 @@ var shape = json.FromJson<Shape>(options); // Returns Circle instance
 #### Validation Attributes
 
 ```csharp
+using JsonToolkit.STJ;
+using JsonToolkit.STJ.Extensions;
+using JsonToolkit.STJ.ValidationAttributes;
+
 public class User
 {
     [JsonRange(1, 120)]
@@ -173,7 +410,198 @@ public class User
     public string Email { get; set; }
 }
 
-var user = json.ValidateAndDeserialize<User>(); // Throws with validation details
+// Validate during deserialization
+var json = """{"name": "John", "age": 30, "email": "john@example.com"}""";
+var user = json.ValidateAndDeserialize<User>(); // Throws JsonValidationException if invalid
+
+// Or validate an existing object
+var existingUser = new User { Name = "John", Age = 30, Email = "john@example.com" };
+var validationResult = existingUser.Validate();
+if (!validationResult.IsValid)
+{
+    foreach (var error in validationResult.Errors)
+    {
+        Console.WriteLine($"Error: {error.Message}");
+    }
+}
+```
+
+## 🔧 Troubleshooting & Common Issues
+
+### JSON Patch Path Casing
+
+**Problem**: JSON Patch operations fail with "path not found" errors.
+
+**Solution**: JSON Patch paths are case-sensitive and must match the exact property names in your JSON:
+
+```csharp
+// ❌ Wrong - property name casing doesn't match
+var patch = new JsonPatchDocument()
+    .Replace("/name", "Jane");  // JSON has "Name" not "name"
+
+// ✅ Correct - exact case match
+var patch = new JsonPatchDocument()
+    .Replace("/Name", "Jane");  // Matches JSON property exactly
+```
+
+### Validation Not Triggering
+
+**Problem**: Validation attributes are ignored during deserialization.
+
+**Solution**: Ensure validation is enabled in your JsonSerializerOptions:
+
+```csharp
+// ❌ Wrong - validation not enabled
+var options = new JsonSerializerOptions();
+var user = JsonSerializer.Deserialize<User>(json, options);
+
+// ✅ Correct - validation enabled
+var options = new JsonSerializerOptions().WithValidation();
+var user = JsonSerializer.Deserialize<User>(json, options);
+
+// Or use the extension method
+var user = json.ValidateAndDeserialize<User>();
+```
+
+### Performance Optimization
+
+**Problem**: Slow JSON processing in high-throughput scenarios.
+
+**Solution**: Reuse JsonSerializerOptions and avoid repeated configuration:
+
+```csharp
+// ❌ Wrong - creates new options every time
+public string SerializeUser(User user)
+{
+    var options = new JsonOptionsBuilder().WithCaseInsensitiveProperties().Build();
+    return JsonSerializer.Serialize(user, options);
+}
+
+// ✅ Correct - reuse configured options
+private static readonly JsonSerializerOptions _options = 
+    new JsonOptionsBuilder().WithCaseInsensitiveProperties().Build();
+
+public string SerializeUser(User user)
+{
+    return JsonSerializer.Serialize(user, _options);
+}
+```
+
+### Migration from Newtonsoft.Json Gotchas
+
+**Key Differences to Watch:**
+
+1. **Property Naming**: System.Text.Json uses PascalCase by default, Newtonsoft.Json uses the original property names
+2. **Null Handling**: Different default behaviors for null values
+3. **Date Formats**: Different default date serialization formats
+
+```csharp
+// Configure JsonToolkit.STJ to match Newtonsoft.Json behavior
+var options = new JsonOptionsBuilder()
+    .WithCaseInsensitiveProperties()  // Handle casing differences
+    .WithFlexibleEnums()              // Handle enum string/number flexibility
+    .Build();
+```
+
+## 📖 Additional Features
+
+### JSON Equality Comparison
+
+```csharp
+using JsonToolkit.STJ.Extensions;
+
+var json1 = """{"name": "John", "age": 30}""";
+var json2 = """{"age": 30, "name": "John"}""";  // Different property order
+
+// Semantic equality (ignores property order)
+bool areEqual = json1.SemanticEquals(json2);  // Returns true
+
+// For arrays, you can choose whether order matters
+var array1 = """{"items": [1, 2, 3]}""";
+var array2 = """{"items": [3, 2, 1]}""";
+
+bool orderSensitive = array1.SemanticEquals(array2, orderSensitive: true);   // false
+bool orderInsensitive = array1.SemanticEquals(array2, orderSensitive: false); // true
+```
+
+### Async Stream Operations
+
+```csharp
+using JsonToolkit.STJ;
+using JsonToolkit.STJ.Extensions;
+
+// Async serialization to stream
+var user = new User { Name = "John", Age = 30 };
+using var stream = new FileStream("user.json", FileMode.Create);
+await user.ToJsonAsync(stream);
+
+// Async deserialization from stream
+using var readStream = new FileStream("user.json", FileMode.Open);
+var deserializedUser = await JsonSerializer.DeserializeEnhancedAsync<User>(readStream);
+
+// Enhanced async methods with better error handling
+await JsonSerializer.SerializeEnhancedAsync(stream, user, options);
+var result = await JsonSerializer.DeserializeEnhancedAsync<User>(stream, options);
+```
+
+### Byte Array Operations
+
+```csharp
+using JsonToolkit.STJ.Extensions;
+
+var user = new User { Name = "John", Age = 30 };
+
+// Serialize to UTF-8 bytes
+byte[] jsonBytes = user.ToJsonBytes();
+
+// Enhanced serialization with error handling
+byte[] enhancedBytes = JsonSerializer.SerializeEnhancedToUtf8Bytes(user, options);
+
+// Deserialize from bytes
+var deserializedUser = JsonSerializer.DeserializeEnhanced<User>(jsonBytes, options);
+```
+
+### LINQ-to-JSON Operations
+
+```csharp
+using System.Text.Json;
+using JsonToolkit.STJ;
+
+var json = """
+{
+  "products": [
+    {"name": "Laptop", "price": 999.99, "category": "Electronics"},
+    {"name": "Book", "price": 19.99, "category": "Education"},
+    {"name": "Phone", "price": 599.99, "category": "Electronics"}
+  ]
+}
+""";
+
+var document = JsonDocument.Parse(json);
+var products = document.RootElement.GetProperty("products");
+
+// Filter products using LINQ-style methods
+var expensiveProducts = products.Where(p => 
+    p.GetProperty("price").GetDouble() > 100);
+
+// Project to new values
+var productNames = products.Select(p => 
+    p.GetProperty("name").GetString());
+
+// Aggregate operations
+var totalValue = products.Sum(p => 
+    p.GetProperty("price").GetDouble());
+
+var averagePrice = products.Average(p => 
+    p.GetProperty("price").GetDouble());
+
+// Find specific items
+var firstElectronics = products.FirstOrDefault(p => 
+    p.GetProperty("category").GetString() == "Electronics");
+
+// Count items
+var electronicsCount = products.Count(p => 
+    p.GetProperty("category").GetString() == "Electronics");
 ```
 
 ## 🎯 Performance
@@ -227,17 +655,6 @@ This project uses GitHub Actions for continuous integration and automated NuGet 
 - **🏗️ Multi-Framework Builds**: Tests on .NET Framework 4.6.2, .NET 6.0, .NET 8.0, and .NET 9.0
 - **⚡ Optimized Performance**: Efficient caching and parallel execution
 - **📦 Automated Releases**: Version tags trigger automatic NuGet publishing
-
-### NuGet Trusted Publishing
-
-This repository uses **NuGet Trusted Publishing** with OpenID Connect (OIDC) for secure, keyless package publishing:
-
-- **No API Keys**: No sensitive credentials stored in repository secrets
-- **Enhanced Security**: Short-lived tokens generated automatically by GitHub
-- **Audit Trail**: Complete publishing history with GitHub Actions logs
-- **Zero Maintenance**: No key rotation or secret management required
-
-For setup instructions, see [NuGet Trusted Publishing Guide](docs/NUGET_TRUSTED_PUBLISHING.md).
 
 ### Release Process
 
