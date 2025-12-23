@@ -66,7 +66,14 @@ jobs:
     - name: Build
       shell: bash
       run: |
+        # Clean any previous builds to avoid artifacts mismatch
+        dotnet clean -c Release
+        # Build with explicit version and deterministic settings
         dotnet build -c Release --no-restore -p:Version=$VERSION -p:ContinuousIntegrationBuild=true -p:Deterministic=true -p:RepositoryUrl=https://github.com/${{ github.repository }} -p:RepositoryCommit=${{ github.sha }}
+        
+        # Verify build outputs
+        echo "Build outputs:"
+        find src/JsonToolkit.STJ/bin/Release -name "*.dll" -o -name "*.pdb" | sort
 
     - name: Test
       shell: bash
@@ -76,7 +83,43 @@ jobs:
       shell: bash
       run: |
         mkdir -p ./artifacts
-        dotnet pack -c Release --no-build -p:Version=$VERSION -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --output ./artifacts
+        # Pack with explicit version to ensure consistency
+        dotnet pack -c Release --no-build -p:Version=$VERSION -p:PackageVersion=$VERSION -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --output ./artifacts
+        
+        # List created packages for debugging
+        echo "Created packages:"
+        ls -la ./artifacts/
+        
+        # Validate package structure
+        for pkg in ./artifacts/*.nupkg; do
+          echo "Main package contents: $pkg"
+          unzip -l "$pkg" | grep -E "lib/.*\.dll" | awk '{print $4}' | sort
+        done
+        
+        for sym in ./artifacts/*.snupkg; do
+          echo "Symbols package contents: $sym"
+          unzip -l "$sym" | grep -E "lib/.*\.pdb" | awk '{print $4}' | sort
+        done
+
+    - name: Validate Package Structure
+      shell: bash
+      run: |
+        # Extract target frameworks from main package and symbols package
+        MAIN_FRAMEWORKS=$(unzip -l ./artifacts/*.nupkg | grep -E "lib/.*\.dll" | sed 's|.*lib/\([^/]*\)/.*|\1|' | sort -u)
+        SYMBOL_FRAMEWORKS=$(unzip -l ./artifacts/*.snupkg | grep -E "lib/.*\.pdb" | sed 's|.*lib/\([^/]*\)/.*|\1|' | sort -u)
+        
+        echo "Main package frameworks: $MAIN_FRAMEWORKS"
+        echo "Symbols package frameworks: $SYMBOL_FRAMEWORKS"
+        
+        # Verify they match
+        if [ "$MAIN_FRAMEWORKS" = "$SYMBOL_FRAMEWORKS" ]; then
+          echo "✅ Package structure validation passed - frameworks match"
+        else
+          echo "❌ Package structure validation failed - framework mismatch"
+          echo "Main: $MAIN_FRAMEWORKS"
+          echo "Symbols: $SYMBOL_FRAMEWORKS"
+          exit 1
+        fi
 
     - name: Publish to NuGet
       shell: bash

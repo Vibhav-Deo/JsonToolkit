@@ -17,7 +17,7 @@
     <AssemblyCopyright>Copyright (c) 2024 JsonToolkit Contributors</AssemblyCopyright>
     
     <!-- Version properties with defaults that can be overridden -->
-    <VersionPrefix Condition="'$(VersionPrefix)' == ''">1.0.0</VersionPrefix>
+    <VersionPrefix Condition="'$(Version)' == '' AND '$(VersionPrefix)' == ''">1.0.0</VersionPrefix>
     <VersionSuffix Condition="'$(VersionSuffix)' == ''"></VersionSuffix>
     <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">1.0.0.0</AssemblyVersion>
     <FileVersion Condition="'$(FileVersion)' == ''">1.0.0.0</FileVersion>
@@ -25,7 +25,7 @@
     
     <!-- NuGet Package Metadata -->
     <PackageId>JsonToolkit.STJ</PackageId>
-    <PackageVersion Condition="'$(PackageVersion)' == ''">1.0.0</PackageVersion>
+    <PackageVersion Condition="'$(Version)' == '' AND '$(PackageVersion)' == ''">1.0.0</PackageVersion>
     <Title>JsonToolkit.STJ - Enhanced System.Text.Json</Title>
     <Authors>JsonToolkit Contributors</Authors>
     <Owners>JsonToolkit Contributors</Owners>
