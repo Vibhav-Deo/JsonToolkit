@@ -157,11 +157,6 @@ namespace JsonToolkit.STJ.Tests.Properties
             try
             {
                 if (data == null || data.Length == 0) return true;
-                // Skip strings with control characters that cause JSON issues
-                foreach (var c in data)
-                {
-                    if (char.IsControl(c)) return true;
-                }
 
                 var options = new JsonOptionsBuilder()
                     .WithPolymorphicTypes(config =>
@@ -174,7 +169,9 @@ namespace JsonToolkit.STJ.Tests.Properties
                     })
                     .Build();
 
-                var json = $"{{\"Data\":\"{data}\"}}"; // No $type property
+                // Use proper serialization to avoid escaping issues
+                var obj = new { Data = data };
+                var json = JsonSerializer.Serialize(obj);
                 var result = JsonSerializer.Deserialize<PolyBase>(json, options);
 
                 // Should use fallback type
