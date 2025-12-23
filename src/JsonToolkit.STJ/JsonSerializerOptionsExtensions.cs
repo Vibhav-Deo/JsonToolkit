@@ -37,6 +37,42 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Enables enhanced case-insensitive property matching with ambiguity detection.
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <param name="configure">Optional action to configure case-insensitive options.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions WithEnhancedCaseInsensitiveProperties(this JsonSerializerOptions options, Action<CaseInsensitivePropertyOptions>? configure = null)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            var caseInsensitiveOptions = new CaseInsensitivePropertyOptions();
+            configure?.Invoke(caseInsensitiveOptions);
+
+            // Enable the built-in case-insensitive property matching
+            options.PropertyNameCaseInsensitive = true;
+
+            return options;
+        }
+
+        /// <summary>
+        /// Enables strict case-sensitive property matching (opt-in strict mode).
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions WithStrictCaseSensitiveProperties(this JsonSerializerOptions options)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            // Disable case-insensitive property matching for strict mode
+            options.PropertyNameCaseInsensitive = false;
+
+            return options;
+        }
+
+        /// <summary>
         /// Enables deep merge capabilities for the JsonSerializerOptions.
         /// </summary>
         /// <param name="options">The JsonSerializerOptions to enhance.</param>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using JsonToolkit.STJ.Converters;
 
 namespace JsonToolkit.STJ
 {
@@ -48,6 +49,29 @@ namespace JsonToolkit.STJ
         {
             _caseInsensitiveProperties = true;
             _configurations.Add(options => options.PropertyNameCaseInsensitive = true);
+            return this;
+        }
+
+        /// <summary>
+        /// Enables enhanced case-insensitive property matching with ambiguity detection.
+        /// </summary>
+        /// <param name="configure">Optional action to configure case-insensitive options.</param>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithEnhancedCaseInsensitiveProperties(Action<CaseInsensitivePropertyOptions>? configure = null)
+        {
+            _caseInsensitiveProperties = true;
+            _configurations.Add(options => options.WithEnhancedCaseInsensitiveProperties(configure));
+            return this;
+        }
+
+        /// <summary>
+        /// Enables strict case-sensitive property matching (opt-in strict mode).
+        /// </summary>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithStrictCaseSensitiveProperties()
+        {
+            _caseInsensitiveProperties = false;
+            _configurations.Add(options => options.WithStrictCaseSensitiveProperties());
             return this;
         }
 
