@@ -173,7 +173,7 @@ namespace JsonToolkit.STJ.Tests.Properties
                 
                 // Register the same converters in reverse order
                 var converters2 = new List<TestConverter>();
-                foreach (var precedence in precedences.Reverse())
+                foreach (var precedence in precedences.AsEnumerable().Reverse())
                 {
                     var converter = new TestConverter(precedence);
                     converters2.Add(converter);

@@ -40,6 +40,11 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- Add Microsoft.CSharp for dynamic support in .NET Standard 2.0 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\JsonToolkit.STJ\JsonToolkit.STJ.csproj" />
   </ItemGroup>
