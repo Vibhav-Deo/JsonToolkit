@@ -59,13 +59,21 @@ jobs:
       run: dotnet restore
 
     - name: Build solution
-      run: dotnet build --no-restore --configuration Debug
+      run: |
+        # Use a CI-friendly version for builds
+        CI_VERSION="1.0.0-ci.${{ github.run_number }}"
+        echo "Building with CI version: $CI_VERSION"
+        dotnet build --no-restore --configuration Debug -p:Version=$CI_VERSION -p:AssemblyVersion=1.0.0.0 -p:FileVersion=1.0.0.${{ github.run_number }} -p:InformationalVersion=$CI_VERSION
 
     - name: Run all tests with coverage collection
       shell: bash
       run: |
         # Create test results directory
         mkdir -p TestResults/${{ matrix.framework }}
+        
+        # Use the same CI version for consistency
+        CI_VERSION="1.0.0-ci.${{ github.run_number }}"
+        echo "Running tests with CI version: $CI_VERSION"
         
         # Run all tests once with coverage collection using the runsettings file
         dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} \
@@ -303,10 +311,16 @@ jobs:
       run: dotnet restore
 
     - name: Build release
-      run: dotnet build --no-restore --configuration Release
+      run: |
+        # Use a CI-friendly version for release builds
+        CI_VERSION="1.0.0-ci.${{ github.run_number }}"
+        echo "Building release with CI version: $CI_VERSION"
+        dotnet build --no-restore --configuration Release -p:Version=$CI_VERSION -p:AssemblyVersion=1.0.0.0 -p:FileVersion=1.0.0.${{ github.run_number }} -p:InformationalVersion=$CI_VERSION
 
     - name: Create NuGet package
-      run: dotnet pack --no-build --configuration Release --output ./artifacts
+      run: |
+        CI_VERSION="1.0.0-ci.${{ github.run_number }}"
+        dotnet pack --no-build --configuration Release --output ./artifacts -p:PackageVersion=$CI_VERSION
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
