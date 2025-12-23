@@ -223,7 +223,10 @@ namespace JsonToolkit.STJ.Tests.Properties
                     bool hasEnumConverter = false;
                     foreach (var converter in options.Converters)
                     {
-                        if (converter is JsonStringEnumConverter)
+                        var converterTypeName = converter.GetType().Name;
+                        if (converter is JsonStringEnumConverter || 
+                            converterTypeName.Contains("FlexibleEnum") ||
+                            converter is JsonConverterFactory factory && factory.GetType().Name.Contains("FlexibleEnum"))
                         {
                             hasEnumConverter = true;
                             break;

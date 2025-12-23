@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using JsonToolkit.STJ.Converters;
@@ -114,9 +115,46 @@ namespace JsonToolkit.STJ
         /// <typeparam name="T">The type to configure defaults for.</typeparam>
         /// <param name="defaults">The default values to use.</param>
         /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
-        public JsonOptionsBuilder WithOptionalDefaults<T>(T defaults) where T : notnull
+        public JsonOptionsBuilder WithOptionalDefaults<T>(T defaults) where T : class, new()
         {
+            if (defaults == null)
+                throw new ArgumentNullException(nameof(defaults));
+
+            _optionalDefaults[typeof(T)] = new OptionalPropertyDefaults<T>(defaults);
+            
+            _configurations.Add(options =>
+            {
+                // Add or update the OptionalPropertyConverterFactory
+                var factory = GetOrCreateOptionalPropertyFactory(options);
+                factory.RegisterDefaults(defaults);
+            });
+            
+            return this;
+        }
+
+        /// <summary>
+        /// Configures optional property defaults for a specific type using a configuration action.
+        /// </summary>
+        /// <typeparam name="T">The type to configure defaults for.</typeparam>
+        /// <param name="configure">Action to configure the defaults.</param>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithOptionalDefaults<T>(Action<OptionalPropertyDefaults<T>> configure) where T : class, new()
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+
+            var defaults = new OptionalPropertyDefaults<T>();
+            configure(defaults);
+            
             _optionalDefaults[typeof(T)] = defaults;
+            
+            _configurations.Add(options =>
+            {
+                // Add or update the OptionalPropertyConverterFactory
+                var factory = GetOrCreateOptionalPropertyFactory(options);
+                factory.RegisterDefaults(defaults);
+            });
+            
             return this;
         }
 
@@ -263,6 +301,27 @@ namespace JsonToolkit.STJ
                 // This is actually fine - both can work together
                 // Just log a warning in a real implementation
             }
+        }
+
+        /// <summary>
+        /// Gets or creates an OptionalPropertyConverterFactory from the options.
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to search.</param>
+        /// <returns>The OptionalPropertyConverterFactory instance.</returns>
+        private static OptionalPropertyConverterFactory GetOrCreateOptionalPropertyFactory(JsonSerializerOptions options)
+        {
+            // Look for existing factory
+            var existingFactory = options.Converters
+                .OfType<OptionalPropertyConverterFactory>()
+                .FirstOrDefault();
+
+            if (existingFactory != null)
+                return existingFactory;
+
+            // Create new factory and add it
+            var factory = new OptionalPropertyConverterFactory();
+            options.Converters.Add(factory);
+            return factory;
         }
     }
 

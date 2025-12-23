@@ -84,17 +84,21 @@ namespace JsonToolkit.STJ.Converters
 
             // Create the appropriate converter type
             Type converterType;
+            object[] constructorArgs;
+            
             if (isNullable)
             {
                 converterType = typeof(NullableFlexibleEnumConverter<>).MakeGenericType(enumType);
+                constructorArgs = new object[] { _defaultOptions };
             }
             else
             {
                 converterType = typeof(FlexibleEnumConverter<>).MakeGenericType(enumType);
+                constructorArgs = new object[] { _defaultOptions, null };
             }
 
             // Create converter instance with options
-            return (JsonConverter)Activator.CreateInstance(converterType, _defaultOptions)!;
+            return (JsonConverter)Activator.CreateInstance(converterType, constructorArgs)!;
         }
     }
 

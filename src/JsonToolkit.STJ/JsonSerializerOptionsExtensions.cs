@@ -106,6 +106,46 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Configures optional property defaults for a specific type.
+        /// </summary>
+        /// <typeparam name="T">The type to configure defaults for.</typeparam>
+        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <param name="defaults">The default values to use.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions WithOptionalDefaults<T>(this JsonSerializerOptions options, T defaults) where T : class, new()
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+            if (defaults == null)
+                throw new ArgumentNullException(nameof(defaults));
+
+            var factory = GetOrCreateOptionalPropertyFactory(options);
+            factory.RegisterDefaults(defaults);
+
+            return options;
+        }
+
+        /// <summary>
+        /// Configures optional property defaults for a specific type using a configuration action.
+        /// </summary>
+        /// <typeparam name="T">The type to configure defaults for.</typeparam>
+        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <param name="configure">Action to configure the defaults.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions WithOptionalDefaults<T>(this JsonSerializerOptions options, Action<OptionalPropertyDefaults<T>> configure) where T : class, new()
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+
+            var factory = GetOrCreateOptionalPropertyFactory(options);
+            factory.RegisterDefaults(configure);
+
+            return options;
+        }
+
+        /// <summary>
         /// Configures the options for Newtonsoft.Json-like behavior.
         /// </summary>
         /// <param name="options">The JsonSerializerOptions to enhance.</param>
@@ -360,15 +400,25 @@ namespace JsonToolkit.STJ
             return null;
         }
 
-        private static int GetConverterPrecedence(JsonConverter converter)
+        /// <summary>
+        /// Gets or creates an OptionalPropertyConverterFactory from the options.
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to search.</param>
+        /// <returns>The OptionalPropertyConverterFactory instance.</returns>
+        private static OptionalPropertyConverterFactory GetOrCreateOptionalPropertyFactory(JsonSerializerOptions options)
         {
-            return converter switch
-            {
-                SimpleJsonConverter<object> simple => simple.Precedence,
-                ReadOnlyJsonConverter<object> readOnly => readOnly.Precedence,
-                WriteOnlyJsonConverter<object> writeOnly => writeOnly.Precedence,
-                _ => 0
-            };
+            // Look for existing factory
+            var existingFactory = options.Converters
+                .OfType<OptionalPropertyConverterFactory>()
+                .FirstOrDefault();
+
+            if (existingFactory != null)
+                return existingFactory;
+
+            // Create new factory and add it
+            var factory = new OptionalPropertyConverterFactory();
+            options.Converters.Add(factory);
+            return factory;
         }
     }
 }
