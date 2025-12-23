@@ -54,6 +54,7 @@ jobs:
       run: |
         dotnet build -c Release --no-restore -p:Version="1.0.0-ci.${{ github.run_number }}" -p:AssemblyVersion="1.0.0.0" -p:FileVersion="1.0.0.${{ github.run_number }}" -p:ContinuousIntegrationBuild=true -p:Deterministic=true
 
-    - name: Test
-      run: |
-        dotnet test -c Release --no-build --framework ${{ matrix.framework }} --logger "trx"
+    - - name: Test
+        shell: bash
+        run: dotnet test -c Release --no-build --framework ${{ matrix.framework }} --logger trx
+
