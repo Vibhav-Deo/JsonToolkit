@@ -17,11 +17,6 @@ namespace JsonToolkit.STJ.Tests.Integration
             var assembly = typeof(JsonOptionsBuilder).Assembly;
             var assemblyName = assembly.GetName();
             
-            // Debug: Print actual version information
-            Console.WriteLine($"Actual Assembly Name: {assemblyName.Name}");
-            Console.WriteLine($"Actual Assembly Version: {assemblyName.Version}");
-            Console.WriteLine($"Expected Version: >= 1.0.0.0");
-            
             // Verify assembly name and version
             Assert.Equal("JsonToolkit.STJ", assemblyName.Name);
             Assert.NotNull(assemblyName.Version);
@@ -95,7 +90,7 @@ namespace JsonToolkit.STJ.Tests.Integration
             // Test that the main configuration class works
             var options = new JsonOptionsBuilder()
                 .WithCaseInsensitiveProperties()
-                .WithIndentation(true)
+                .WithIndentation()
                 .Build();
             
             Assert.NotNull(options);
@@ -127,7 +122,7 @@ namespace JsonToolkit.STJ.Tests.Integration
         {
             // Verify we're running on a supported framework
             var frameworkName = GetCurrentFramework();
-            var supportedFrameworks = new[] { "net462", "netstandard2.0", "net6.0", "net8.0" };
+            var supportedFrameworks = new[] { "net462", "netstandard2.0", "net6.0", "net8.0", "net9.0" };
             
             Assert.Contains(frameworkName, supportedFrameworks);
         }
@@ -142,6 +137,8 @@ namespace JsonToolkit.STJ.Tests.Integration
             return "net6.0";
 #elif NET8_0
             return "net8.0";
+#elif NET9_0
+            return "net9.0";
 #else
             return "unknown";
 #endif

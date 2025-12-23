@@ -3,7 +3,6 @@ using System.Reflection;
 using System.Text.Json;
 using FsCheck;
 using FsCheck.Xunit;
-using Xunit;
 
 namespace JsonToolkit.STJ.Tests.Properties
 {
@@ -34,7 +33,6 @@ namespace JsonToolkit.STJ.Tests.Properties
                 
                 // Verify the assembly can be loaded and basic types are accessible
                 var assemblyName = assembly.GetName();
-                var targetFramework = GetTargetFramework();
                 
                 // Verify conditional compilation symbols are working correctly
                 var hasCorrectSymbols = VerifyConditionalCompilation();
@@ -97,6 +95,8 @@ namespace JsonToolkit.STJ.Tests.Properties
             return "net6.0";
 #elif NET8_0
             return "net8.0";
+#elif NET9_0
+            return "net9.0";
 #else
             return "unknown";
 #endif
@@ -133,6 +133,12 @@ namespace JsonToolkit.STJ.Tests.Properties
 #else
                     return false;
 #endif
+                case "net9.0":
+#if NET9_0
+                    return true;
+#else
+                    return false;
+#endif
                 default:
                     return false;
             }
@@ -160,6 +166,7 @@ namespace JsonToolkit.STJ.Tests.Properties
                         
                     case "net6.0":
                     case "net8.0":
+                    case "net9.0":
                         // Modern .NET should have full feature set
                         return !string.IsNullOrEmpty(json) && VerifySystemTextJsonAvailable() && VerifyModernFeatures();
                         
@@ -177,14 +184,12 @@ namespace JsonToolkit.STJ.Tests.Properties
         {
             try
             {
-                // Verify System.Text.Json types are available
-                var jsonElementType = typeof(JsonElement);
-                var jsonSerializerType = typeof(JsonSerializer);
-                var jsonSerializerOptionsType = typeof(JsonSerializerOptions);
+                // Verify System.Text.Json types are available by attempting to use them
+                var testData = new { Test = "Value" };
+                var json = JsonSerializer.Serialize(testData);
+                var element = JsonSerializer.Deserialize<JsonElement>(json);
                 
-                return jsonElementType != null && 
-                       jsonSerializerType != null && 
-                       jsonSerializerOptionsType != null;
+                return !string.IsNullOrEmpty(json) && element.ValueKind != JsonValueKind.Undefined;
             }
             catch
             {
@@ -194,16 +199,19 @@ namespace JsonToolkit.STJ.Tests.Properties
 
         private static bool VerifyModernFeatures()
         {
-#if NET6_0 || NET8_0
+#if NET6_0 || NET8_0 || NET9_0
             try
             {
-                // Verify modern .NET features are available
+                // Verify modern .NET features are available by using them
                 var options = new JsonSerializerOptions
                 {
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
                 };
                 
-                return options != null;
+                var testData = new { TestProperty = "value" };
+                var json = JsonSerializer.Serialize(testData, options);
+                
+                return json.Contains("testProperty"); // Verify camelCase naming worked
             }
             catch
             {
