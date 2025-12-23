@@ -32,7 +32,9 @@ jobs:
 
     - uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: |
+          6.0.x
+          8.0.x
 
     - name: Extract version
       id: version
@@ -70,7 +72,7 @@ jobs:
           -p:RepositoryCommit=${{ github.sha }}
 
     - name: Test
-      run: dotnet test -c Release --no-build
+      run: dotnet test -c Release --no-build --framework net8.0
 
     - name: Pack
       run: |
