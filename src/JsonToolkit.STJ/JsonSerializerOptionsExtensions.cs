@@ -90,6 +90,43 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Configures enhanced null handling with distinction between missing, null, and default values.
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <param name="configure">Optional action to configure null handling options.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions WithEnhancedNullHandling(this JsonSerializerOptions options, Action<NullHandlingOptions>? configure = null)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            var nullOptions = new NullHandlingOptions();
+            configure?.Invoke(nullOptions);
+
+            // Apply null handling configuration
+            switch (nullOptions.SerializationBehavior)
+            {
+                case NullSerializationBehavior.Omit:
+                    options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+                    break;
+                case NullSerializationBehavior.Conditional:
+                    options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault;
+                    break;
+                case NullSerializationBehavior.Include:
+                default:
+                    options.DefaultIgnoreCondition = JsonIgnoreCondition.Never;
+                    break;
+            }
+
+            if (nullOptions.SkipDefaultValues)
+            {
+                options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault;
+            }
+
+            return options;
+        }
+
+        /// <summary>
         /// Enables better null handling with distinction between missing, null, and default values.
         /// </summary>
         /// <param name="options">The JsonSerializerOptions to enhance.</param>

@@ -211,6 +211,17 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Configures enhanced null handling.
+        /// </summary>
+        /// <param name="configure">Action to configure null handling options.</param>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithEnhancedNullHandling(Action<NullHandlingOptions> configure)
+        {
+            _configurations.Add(options => options.WithEnhancedNullHandling(configure));
+            return this;
+        }
+
+        /// <summary>
         /// Configures how to handle null values during serialization.
         /// </summary>
         /// <param name="ignoreNullValues">True to ignore null values, false to include them.</param>
