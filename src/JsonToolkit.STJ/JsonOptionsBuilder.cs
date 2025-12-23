@@ -250,6 +250,16 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Enables support for modern C# features like records and init-only properties.
+        /// </summary>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithModernCSharpSupport()
+        {
+            _configurations.Add(options => options.WithModernCSharpSupport());
+            return this;
+        }
+
+        /// <summary>
         /// Applies a custom configuration action to the options.
         /// </summary>
         /// <param name="configure">The configuration action to apply.</param>

@@ -315,6 +315,20 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Enables support for modern C# features like records and init-only properties.
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions WithModernCSharpSupport(this JsonSerializerOptions options)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            options.Converters.Add(new ModernCSharpConverterFactory());
+            return options;
+        }
+
+        /// <summary>
         /// Validates the JsonSerializerOptions configuration.
         /// </summary>
         /// <param name="options">The JsonSerializerOptions to validate.</param>
