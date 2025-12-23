@@ -23,6 +23,10 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            dotnet: 9.0.x
+            framework: net9.0
+            name: Linux .NET 9
+          - os: ubuntu-latest
             dotnet: 8.0.x
             framework: net8.0
             name: Linux .NET 8

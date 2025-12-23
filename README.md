@@ -24,7 +24,7 @@
 - **🆕 Modern C# Support**: Records, init-only properties, required properties, immutable collections
 - **🔧 Extension Methods**: Newtonsoft.Json-style convenience methods (ToJson, FromJson, DeepClone)
 - **📊 Dynamic Access**: JElement class for JObject-like functionality
-- **🎯 Multi-Framework**: .NET Framework 4.6.2+, .NET Standard 2.0, .NET 6.0+
+- **🎯 Multi-Framework**: .NET Framework 4.6.2+, .NET Standard 2.0, .NET 6.0+, .NET 9.0
 
 ## 📦 Installation
 
@@ -182,16 +182,16 @@ JsonToolkit.STJ maintains System.Text.Json's performance characteristics while a
 
 ### Benchmark Results
 
-| Operation | .NET 8.0 | .NET Framework 4.6.2 | Description |
-|-----------|----------|----------------------|-------------|
-| **Basic Serialization** | 53ms (1000 iterations) | 389ms (1000 iterations) | Raw serialization performance vs System.Text.Json |
-| **Basic Deserialization** | 143ms (1000 iterations) | 779ms (1000 iterations) | Raw deserialization performance vs System.Text.Json |
-| **Deep Merge** | 0.03ms per operation | 0.09ms per operation | Recursive JSON object merging |
-| **JSON Patch** | 0.02ms per operation | 0.14ms per operation | RFC 6902 patch operations |
-| **JsonPath Query** | 0.70ms per operation | 2.70ms per operation | Query 1000 items with filter |
-| **JElement Access** | 0.002ms per operation | 0.007ms per operation | Dynamic property access |
-| **Large Document (1.2MB)** | Serialize: 3ms, Deserialize: 12ms | Serialize: 22ms, Deserialize: 45ms | Processing large JSON documents |
-| **Memory Usage** | ~3MB increase (100 operations) | ~3.3MB increase (100 operations) | Memory overhead for mixed operations |
+| Operation | .NET 9.0 | .NET 8.0 | .NET Framework 4.6.2 | Description |
+|-----------|----------|----------|----------------------|-------------|
+| **Basic Serialization** | TBD | 53ms (1000 iterations) | 389ms (1000 iterations) | Raw serialization performance vs System.Text.Json |
+| **Basic Deserialization** | TBD | 143ms (1000 iterations) | 779ms (1000 iterations) | Raw deserialization performance vs System.Text.Json |
+| **Deep Merge** | TBD | 0.03ms per operation | 0.09ms per operation | Recursive JSON object merging |
+| **JSON Patch** | TBD | 0.02ms per operation | 0.14ms per operation | RFC 6902 patch operations |
+| **JsonPath Query** | TBD | 0.70ms per operation | 2.70ms per operation | Query 1000 items with filter |
+| **JElement Access** | TBD | 0.002ms per operation | 0.007ms per operation | Dynamic property access |
+| **Large Document (1.2MB)** | TBD | Serialize: 3ms, Deserialize: 12ms | Serialize: 22ms, Deserialize: 45ms | Processing large JSON documents |
+| **Memory Usage** | TBD | ~3MB increase (100 operations) | ~3.3MB increase (100 operations) | Memory overhead for mixed operations |
 
 ### Performance Characteristics
 
@@ -224,7 +224,7 @@ This project uses GitHub Actions for continuous integration and automated NuGet 
 - **🔒 Secure Publishing**: Uses NuGet Trusted Publishing with OIDC (no API keys stored)
 - **🧪 Comprehensive Testing**: Unit tests and property-based tests across multiple frameworks
 - **📊 Coverage Reports**: Automated code coverage reporting and artifact collection
-- **🏗️ Multi-Framework Builds**: Tests on .NET Framework 4.6.2, .NET 6.0, and .NET 8.0
+- **🏗️ Multi-Framework Builds**: Tests on .NET Framework 4.6.2, .NET 6.0, .NET 8.0, and .NET 9.0
 - **⚡ Optimized Performance**: Efficient caching and parallel execution
 - **📦 Automated Releases**: Version tags trigger automatic NuGet publishing
 
