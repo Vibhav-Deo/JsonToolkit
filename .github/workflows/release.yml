@@ -4,553 +4,74 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., v1.2.3)'
-        required: true
-        type: string
 
-# OIDC permissions for NuGet Trusted Publishing
 permissions:
-  id-token: write   # Required for OIDC token generation
-  contents: read    # Required to read repository contents
-  actions: read     # Required to read workflow information
+  id-token: write
+  contents: read
 
 env:
+  PACKAGE_ID: JsonToolkit.STJ
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
-  validate-version:
-    name: Validate Version
+  release:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.extract-version.outputs.version }}
-      version-number: ${{ steps.extract-version.outputs.version-number }}
-      is-prerelease: ${{ steps.extract-version.outputs.is-prerelease }}
-    
+    environment: nuget-production
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Extract version from tag or input
-      id: extract-version
+    - uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Extract version
+      id: version
       shell: bash
       run: |
-        # Determine version source
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          VERSION_TAG="${{ github.event.inputs.version }}"
-          echo "Using manual version: $VERSION_TAG"
-        else
-          VERSION_TAG="${{ github.ref_name }}"
-          echo "Using tag version: $VERSION_TAG"
-        fi
-        
-        # Validate version format (v{MAJOR}.{MINOR}.{PATCH} with optional pre-release)
-        if [[ ! "$VERSION_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?$ ]]; then
-          echo "❌ Invalid version format: $VERSION_TAG"
-          echo "Expected format: v{MAJOR}.{MINOR}.{PATCH} or v{MAJOR}.{MINOR}.{PATCH}-{PRERELEASE}"
+        VERSION="${GITHUB_REF_NAME#v}"
+
+        if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?$ ]]; then
+          echo "Invalid version: $VERSION"
           exit 1
         fi
-        
-        # Extract version number (remove 'v' prefix)
-        VERSION_NUMBER="${VERSION_TAG#v}"
-        echo "Extracted version number: $VERSION_NUMBER"
-        
-        # Check if this is a pre-release version
-        if [[ "$VERSION_NUMBER" =~ -[a-zA-Z0-9\.-]+ ]]; then
-          IS_PRERELEASE="true"
-          echo "This is a pre-release version"
-        else
-          IS_PRERELEASE="false"
-          echo "This is a stable release version"
-        fi
-        
-        # Validate semantic versioning format
-        if [[ ! "$VERSION_NUMBER" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?$ ]]; then
-          echo "❌ Version does not follow semantic versioning: $VERSION_NUMBER"
-          exit 1
-        fi
-        
-        # Set outputs
-        echo "version=$VERSION_TAG" >> $GITHUB_OUTPUT
-        echo "version-number=$VERSION_NUMBER" >> $GITHUB_OUTPUT
-        echo "is-prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-        
-        # Add to step summary
-        echo "## 📋 Version Information" >> $GITHUB_STEP_SUMMARY
-        echo "- **Tag**: $VERSION_TAG" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version**: $VERSION_NUMBER" >> $GITHUB_STEP_SUMMARY
-        echo "- **Pre-release**: $IS_PRERELEASE" >> $GITHUB_STEP_SUMMARY
 
-    - name: Check if version already exists on NuGet
-      shell: bash
-      run: |
-        VERSION_NUMBER="${{ steps.extract-version.outputs.version-number }}"
-        
-        # Check if package version already exists on NuGet.org
-        echo "Checking if JsonToolkit.STJ version $VERSION_NUMBER already exists on NuGet.org..."
-        
-        # Use NuGet API to check if version exists
-        RESPONSE=$(curl -s "https://api.nuget.org/v3-flatcontainer/jsontoolkit.stj/index.json" || echo '{"versions":[]}')
-        
-        # Check if the version exists in the response
-        if echo "$RESPONSE" | grep -q "\"$VERSION_NUMBER\""; then
-          echo "❌ Version $VERSION_NUMBER already exists on NuGet.org"
-          echo "Please use a different version number."
-          exit 1
-        else
-          echo "✅ Version $VERSION_NUMBER is available"
-        fi
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-  build-and-test:
-    name: Build and Test Release
-    runs-on: ${{ matrix.os }}
-    needs: validate-version
-    
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - os: ubuntu-latest
-            dotnet-version: '8.0.x'
-            framework: net8.0
-            display-name: 'Linux .NET 8.0'
-          - os: ubuntu-latest
-            dotnet-version: '6.0.x'
-            framework: net6.0
-            display-name: 'Linux .NET 6.0'
-          - os: windows-latest
-            dotnet-version: '4.6.2'
-            framework: net462
-            display-name: 'Windows .NET Framework 4.6.2'
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          6.0.x
-          8.0.x
-        dotnet-quality: 'ga'
-
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
-
-    - name: Restore dependencies
+    - name: Restore
       run: dotnet restore
 
-    - name: Build solution in Release configuration
-      shell: bash
+    - name: Build
       run: |
-        echo "Building with version: ${{ needs.validate-version.outputs.version-number }}"
-        dotnet build --no-restore --configuration Release -p:Version=${{ needs.validate-version.outputs.version-number }} -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} -p:FileVersion=${{ needs.validate-version.outputs.version-number }} -p:PackageVersion=${{ needs.validate-version.outputs.version-number }}
+        dotnet build -c Release --no-restore \
+          -p:Version=$VERSION \
+          -p:ContinuousIntegrationBuild=true \
+          -p:Deterministic=true \
+          -p:RepositoryUrl=https://github.com/${{ github.repository }} \
+          -p:RepositoryCommit=${{ github.sha }}
 
-    - name: Run comprehensive test suite
-      shell: bash
+    - name: Test
+      run: dotnet test -c Release --no-build
+
+    - name: Pack
       run: |
-        echo "Running complete test suite for release validation..."
-        
-        # Create test results directory
-        mkdir -p TestResults/Release/${{ matrix.framework }}
-        
-        # Run all tests with detailed logging
-        dotnet test --no-build --configuration Release --framework ${{ matrix.framework }} --logger "trx;LogFileName=release-tests-${{ matrix.framework }}.trx" --logger "console;verbosity=detailed" --results-directory TestResults/Release/${{ matrix.framework }} --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[JsonToolkit.STJ]*" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[JsonToolkit.STJ.Tests]*"
+        dotnet pack -c Release --no-build \
+          -p:Version=$VERSION \
+          -p:IncludeSymbols=true \
+          -p:SymbolPackageFormat=snupkg \
+          --output ./artifacts
 
-    - name: Upload release test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: release-test-results-${{ matrix.os }}-${{ matrix.framework }}
-        path: |
-          TestResults/Release/${{ matrix.framework }}/*.trx
-          TestResults/Release/${{ matrix.framework }}/**/coverage.cobertura.xml
-        retention-days: 90
-        if-no-files-found: warn
-
-    - name: Validate test results
-      shell: bash
+    - name: Publish to NuGet (OIDC)
       run: |
-        echo "## Release Test Results for ${{ matrix.display-name }}" >> $GITHUB_STEP_SUMMARY
-        
-        # Check for test failures
-        if find TestResults/Release/${{ matrix.framework }} -name "*.trx" -exec grep -l "outcome=\"Failed\"" {} \; 2>/dev/null | head -1 > /dev/null 2>&1; then
-          echo "❌ **Tests failed** - Release cannot proceed" >> $GITHUB_STEP_SUMMARY
-          exit 1
-        else
-          echo "✅ **All tests passed** - Ready for release" >> $GITHUB_STEP_SUMMARY
-        fi
+        dotnet nuget push "./artifacts/*.nupkg" \
+          --source https://api.nuget.org/v3/index.json \
+          --api-key PLACEHOLDER \
+          --skip-duplicate
 
-  create-package:
-    name: Create Release Package
-    runs-on: ubuntu-latest
-    needs: [validate-version, build-and-test]
-    outputs:
-      package-path: ${{ steps.create-package.outputs.package-path }}
-      package-name: ${{ steps.create-package.outputs.package-name }}
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          6.0.x
-          8.0.x
-        dotnet-quality: 'ga'
-
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
-
-    - name: Restore dependencies
-      run: dotnet restore
-
-    - name: Build release with version injection
-      shell: bash
-      run: |
-        echo "Building release package with version: ${{ needs.validate-version.outputs.version-number }}"
-        dotnet build --no-restore --configuration Release -p:Version=${{ needs.validate-version.outputs.version-number }} -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} -p:FileVersion=${{ needs.validate-version.outputs.version-number }} -p:PackageVersion=${{ needs.validate-version.outputs.version-number }} -p:RepositoryCommit=${{ github.sha }} -p:RepositoryBranch=${{ github.ref_name }}
-
-    - name: Create NuGet package
-      id: create-package
-      shell: bash
-      run: |
-        echo "Creating NuGet package..."
-        mkdir -p ./release-artifacts
-        
-        # Create the package with version information
-        dotnet pack --no-build --configuration Release --output ./release-artifacts -p:PackageVersion=${{ needs.validate-version.outputs.version-number }} -p:Version=${{ needs.validate-version.outputs.version-number }} -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} -p:FileVersion=${{ needs.validate-version.outputs.version-number }}
-        
-        # Find the created package
-        PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" 2>/dev/null | head -1)
-        PACKAGE_NAME=$(basename "$PACKAGE_FILE")
-        
-        if [ -z "$PACKAGE_FILE" ]; then
-          echo "❌ No package file created"
-          exit 1
-        fi
-        
-        echo "✅ Package created: $PACKAGE_NAME"
-        echo "Package size: $(du -h "$PACKAGE_FILE" | cut -f1)"
-        
-        # Set outputs
-        echo "package-path=$PACKAGE_FILE" >> $GITHUB_OUTPUT
-        echo "package-name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
-        
-        # Generate package checksum
-        CHECKSUM=$(sha256sum "$PACKAGE_FILE" | cut -d' ' -f1)
-        echo "Package SHA256: $CHECKSUM"
-        echo "$CHECKSUM  $PACKAGE_NAME" > ./release-artifacts/checksums.txt
-        
-        # Add to step summary
-        echo "## 📦 Package Information" >> $GITHUB_STEP_SUMMARY
-        echo "- **Package**: $PACKAGE_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version**: ${{ needs.validate-version.outputs.version-number }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Size**: $(du -h "$PACKAGE_FILE" | cut -f1)" >> $GITHUB_STEP_SUMMARY
-        echo "- **SHA256**: $CHECKSUM" >> $GITHUB_STEP_SUMMARY
-
-    - name: Validate package contents
-      shell: bash
-      run: |
-        PACKAGE_FILE="${{ steps.create-package.outputs.package-path }}"
-        
-        echo "Validating package contents..."
-        
-        # Extract and examine package contents (NuGet packages are ZIP files)
-        mkdir -p ./package-validation
-        cd ./package-validation
-        unzip -q "../$PACKAGE_FILE"
-        
-        echo "Package contents:"
-        find . -type f | sort
-        
-        # Validate required files exist
-        if [ ! -f "JsonToolkit.STJ.nuspec" ]; then
-          echo "❌ Missing nuspec file"
-          exit 1
-        fi
-        
-        # Check if assemblies exist for target frameworks
-        if [ ! -d "lib" ]; then
-          echo "❌ Missing lib directory"
-          exit 1
-        fi
-        
-        echo "✅ Package validation passed"
-
-    - name: Upload release package
-      uses: actions/upload-artifact@v4
-      with:
-        name: release-package-${{ needs.validate-version.outputs.version-number }}
-        path: |
-          ./release-artifacts/*.nupkg
-          ./release-artifacts/checksums.txt
-        retention-days: 90
-        if-no-files-found: error
-
-  publish-nuget:
-    name: Publish to NuGet.org
-    runs-on: ubuntu-latest
-    needs: [validate-version, build-and-test, create-package]
-    # Only run on successful completion of all dependencies
-    if: success()
-    
-    # Explicit OIDC permissions for this job
-    permissions:
-      id-token: write   # Required for OIDC token generation
-      contents: read    # Required to read repository contents
-    
-    environment:
-      name: nuget-production
-      url: https://www.nuget.org/packages/JsonToolkit.STJ
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          6.0.x
-          8.0.x
-        dotnet-quality: 'ga'
-
-    - name: Download release package
-      uses: actions/download-artifact@v4
-      with:
-        name: release-package-${{ needs.validate-version.outputs.version-number }}
-        path: ./release-artifacts
-
-    - name: Validate OIDC environment
-      shell: bash
-      run: |
-        echo "Validating OIDC environment for NuGet Trusted Publishing..."
-        
-        # Run the validation script
-        if [ -f "./scripts/validate-oidc-setup.sh" ]; then
-          chmod +x ./scripts/validate-oidc-setup.sh
-          ./scripts/validate-oidc-setup.sh
-        fi
-        
-        # Check if we're in the right context for OIDC
-        if [ -z "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then
-          echo "❌ OIDC token request token not available"
-          echo "This may indicate that OIDC is not properly configured for this repository"
-          exit 1
-        fi
-        
-        if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
-          echo "❌ OIDC token request URL not available"
-          exit 1
-        fi
-        
-        echo "✅ OIDC environment variables are available"
-        echo "- Repository: ${{ github.repository }}"
-        echo "- Ref: ${{ github.ref }}"
-        echo "- SHA: ${{ github.sha }}"
-        echo "- Run ID: ${{ github.run_id }}"
-
-    - name: Validate publishing permissions
-      shell: bash
-      run: |
-        echo "Validating publishing permissions..."
-        
-        # Check that we have the package to publish
-        PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" 2>/dev/null | head -1)
-        if [ -z "$PACKAGE_FILE" ]; then
-          echo "❌ No package file found in artifacts"
-          exit 1
-        fi
-        
-        echo "✅ Package file found: $(basename "$PACKAGE_FILE")"
-        echo "Package size: $(du -h "$PACKAGE_FILE" | cut -f1)"
-        
-        # Verify package version matches expected version
-        PACKAGE_NAME=$(basename "$PACKAGE_FILE")
-        EXPECTED_VERSION="${{ needs.validate-version.outputs.version-number }}"
-        
-        if [[ ! "$PACKAGE_NAME" =~ $EXPECTED_VERSION ]]; then
-          echo "❌ Package version mismatch"
-          echo "Expected version: $EXPECTED_VERSION"
-          echo "Package name: $PACKAGE_NAME"
-          exit 1
-        fi
-        
-        echo "✅ Package version validation passed"
-
-    - name: Publish to NuGet.org using OIDC
-      shell: bash
-      run: |
-        echo "Publishing package to NuGet.org using OIDC Trusted Publishing..."
-        
-        PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" 2>/dev/null | head -1)
-        PACKAGE_NAME=$(basename "$PACKAGE_FILE")
-        
-        echo "Publishing: $PACKAGE_NAME"
-        echo "Version: ${{ needs.validate-version.outputs.version-number }}"
-        echo "Using OIDC authentication (no API key required)"
-        
-        # Publish using dotnet nuget push with OIDC
-        # The --api-key parameter is required but will be ignored when using OIDC
-        # We use a placeholder value as recommended by Microsoft
-        dotnet nuget push "$PACKAGE_FILE" --source https://api.nuget.org/v3/index.json --api-key "PLACEHOLDER_FOR_OIDC" --skip-duplicate --no-symbols --timeout 300
-        
-        if [ $? -eq 0 ]; then
-          echo "✅ Package published successfully to NuGet.org"
-          echo "Package URL: https://www.nuget.org/packages/JsonToolkit.STJ/${{ needs.validate-version.outputs.version-number }}"
-        else
-          echo "❌ Package publishing failed"
-          exit 1
-        fi
-
-    - name: Verify package availability
-      shell: bash
-      run: |
-        echo "Verifying package availability on NuGet.org..."
-        
-        VERSION="${{ needs.validate-version.outputs.version-number }}"
-        MAX_ATTEMPTS=10
-        ATTEMPT=1
-        
-        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Checking package availability..."
-          
-          # Check if the package version is available via NuGet API
-          RESPONSE=$(curl -s "https://api.nuget.org/v3-flatcontainer/jsontoolkit.stj/index.json" || echo '{"versions":[]}')
-          
-          if echo "$RESPONSE" | grep -q "\"$VERSION\""; then
-            echo "✅ Package version $VERSION is now available on NuGet.org"
-            echo "Package URL: https://www.nuget.org/packages/JsonToolkit.STJ/$VERSION"
-            break
-          else
-            echo "Package not yet available, waiting 30 seconds..."
-            sleep 30
-            ATTEMPT=$((ATTEMPT + 1))
-          fi
-        done
-        
-        if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-          echo "⚠️ Package may still be processing on NuGet.org"
-          echo "This is normal and the package should be available shortly"
-        fi
-
-    - name: Generate publishing summary
-      if: always()
-      shell: bash
-      run: |
-        echo "## 📦 NuGet Publishing Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- **Package**: JsonToolkit.STJ" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version**: ${{ needs.validate-version.outputs.version-number }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Authentication**: OIDC Trusted Publishing" >> $GITHUB_STEP_SUMMARY
-        echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "${{ job.status }}" = "success" ]; then
-          echo "### ✅ Publishing Successful" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Package Links:**" >> $GITHUB_STEP_SUMMARY
-          echo "- [NuGet Gallery](https://www.nuget.org/packages/JsonToolkit.STJ/${{ needs.validate-version.outputs.version-number }})" >> $GITHUB_STEP_SUMMARY
-          echo "- [Package Download](https://www.nuget.org/api/v2/package/JsonToolkit.STJ/${{ needs.validate-version.outputs.version-number }})" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "### ❌ Publishing Failed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Troubleshooting:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Verify NuGet Trusted Publishing is configured for this repository" >> $GITHUB_STEP_SUMMARY
-          echo "- Check that the package version doesn't already exist" >> $GITHUB_STEP_SUMMARY
-          echo "- Ensure repository has proper OIDC permissions" >> $GITHUB_STEP_SUMMARY
-        fi
-
-  release-summary:
-    name: Release Summary
-    runs-on: ubuntu-latest
-    needs: [validate-version, build-and-test, create-package, publish-nuget]
-    if: always()
-    
-    steps:
-    - name: Generate release summary
-      shell: bash
-      run: |
-        echo "## 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Version information
-        echo "### Version Information" >> $GITHUB_STEP_SUMMARY
-        echo "- **Version**: ${{ needs.validate-version.outputs.version-number }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Tag**: ${{ needs.validate-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Pre-release**: ${{ needs.validate-version.outputs.is-prerelease }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Job status summary
-        echo "### Job Status" >> $GITHUB_STEP_SUMMARY
-        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Version Validation | ${{ needs.validate-version.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Build and Test | ${{ needs.build-and-test.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Package Creation | ${{ needs.create-package.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| NuGet Publishing | ${{ needs.publish-nuget.result }} |" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Overall status
-        if [[ "${{ needs.validate-version.result }}" == "success" && 
-              "${{ needs.build-and-test.result }}" == "success" && 
-              "${{ needs.create-package.result }}" == "success" &&
-              "${{ needs.publish-nuget.result }}" == "success" ]]; then
-          echo "### ✅ Release Complete" >> $GITHUB_STEP_SUMMARY
-          echo "Package successfully published to NuGet.org!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Release Information:**" >> $GITHUB_STEP_SUMMARY
-          echo "- **Package**: ${{ needs.create-package.outputs.package-name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **NuGet URL**: https://www.nuget.org/packages/JsonToolkit.STJ/${{ needs.validate-version.outputs.version-number }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Authentication**: OIDC Trusted Publishing" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "### ❌ Release Failed" >> $GITHUB_STEP_SUMMARY
-          echo "Some steps failed. Please review the errors above." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Failed Steps:**" >> $GITHUB_STEP_SUMMARY
-          [[ "${{ needs.validate-version.result }}" != "success" ]] && echo "- Version Validation" >> $GITHUB_STEP_SUMMARY
-          [[ "${{ needs.build-and-test.result }}" != "success" ]] && echo "- Build and Test" >> $GITHUB_STEP_SUMMARY
-          [[ "${{ needs.create-package.result }}" != "success" ]] && echo "- Package Creation" >> $GITHUB_STEP_SUMMARY
-          [[ "${{ needs.publish-nuget.result }}" != "success" ]] && echo "- NuGet Publishing" >> $GITHUB_STEP_SUMMARY
-        fi
-
-    - name: Check overall release status
-      shell: bash
-      run: |
-        if [[ "${{ needs.validate-version.result }}" != "success" || 
-              "${{ needs.build-and-test.result }}" != "success" || 
-              "${{ needs.create-package.result }}" != "success" ||
-              "${{ needs.publish-nuget.result }}" != "success" ]]; then
-          echo "❌ Release workflow failed"
-          exit 1
-        else
-          echo "✅ Release workflow completed successfully"
-          echo "Package published to NuGet.org: https://www.nuget.org/packages/JsonToolkit.STJ/${{ needs.validate-version.outputs.version-number }}"
-        fi
+        dotnet nuget push "./artifacts/*.snupkg" \
+          --source https://api.nuget.org/v3/index.json \
+          --api-key PLACEHOLDER \
+          --skip-duplicate

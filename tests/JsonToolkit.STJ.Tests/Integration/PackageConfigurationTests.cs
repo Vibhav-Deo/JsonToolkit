@@ -17,10 +17,16 @@ namespace JsonToolkit.STJ.Tests.Integration
             var assembly = typeof(JsonOptionsBuilder).Assembly;
             var assemblyName = assembly.GetName();
             
+            // Debug: Print actual version information
+            Console.WriteLine($"Actual Assembly Name: {assemblyName.Name}");
+            Console.WriteLine($"Actual Assembly Version: {assemblyName.Version}");
+            Console.WriteLine($"Expected Version: >= 1.0.0.0");
+            
             // Verify assembly name and version
             Assert.Equal("JsonToolkit.STJ", assemblyName.Name);
             Assert.NotNull(assemblyName.Version);
-            Assert.True(assemblyName.Version >= new Version(1, 0, 0, 0));
+            Assert.True(assemblyName.Version >= new Version(1, 0, 0, 0), 
+                $"Assembly version {assemblyName.Version} should be >= 1.0.0.0");
         }
 
         [Fact]

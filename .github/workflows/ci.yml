@@ -1,367 +1,62 @@
 name: CI
 
 on:
+  pull_request:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
-  build-and-test:
-    name: Build and Test
+  build-test:
+    name: Build & Test (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    
+
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - os: ubuntu-latest
-            dotnet-version: '8.0.x'
+            dotnet: 8.0.x
             framework: net8.0
-            display-name: 'Linux .NET 8.0'
+            name: Linux .NET 8
           - os: ubuntu-latest
-            dotnet-version: '6.0.x'
+            dotnet: 6.0.x
             framework: net6.0
-            display-name: 'Linux .NET 6.0'
+            name: Linux .NET 6
           - os: windows-latest
-            dotnet-version: '8.0.x'
+            dotnet: 8.0.x
             framework: net462
-            display-name: 'Windows .NET Framework 4.6.2'
+            name: Windows .NET Framework
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+    - uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    - uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          6.0.x
-          8.0.x
-        dotnet-quality: 'ga'
+        dotnet-version: ${{ matrix.dotnet }}
 
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
+    - uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
 
-    - name: Restore dependencies
+    - name: Restore
       run: dotnet restore
 
-    - name: Build solution
+    - name: Build
       run: |
-        # Use a CI-friendly version for builds
-        CI_VERSION="1.0.0-ci.${{ github.run_number }}"
-        echo "Building with CI version: $CI_VERSION"
-        dotnet build --no-restore --configuration Debug -p:Version=$CI_VERSION -p:AssemblyVersion=1.0.0.0 -p:FileVersion=1.0.0.${{ github.run_number }} -p:InformationalVersion=$CI_VERSION
+        dotnet build -c Release --no-restore \
+          -p:ContinuousIntegrationBuild=true \
+          -p:Deterministic=true
 
-    - name: Run all tests with coverage collection
-      shell: bash
+    - name: Test
       run: |
-        # Create test results directory
-        mkdir -p TestResults/${{ matrix.framework }}
-        
-        # Use the same CI version for consistency
-        CI_VERSION="1.0.0-ci.${{ github.run_number }}"
-        echo "Running tests with CI version: $CI_VERSION"
-        
-        # Run all tests once with coverage collection using the runsettings file
-        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} \
-          --logger "trx;LogFileName=test-results-${{ matrix.framework }}.trx" \
-          --logger "console;verbosity=detailed" \
-          --results-directory TestResults/${{ matrix.framework }} \
-          --collect:"XPlat Code Coverage" \
-          --settings coverlet.runsettings
-
-    - name: Debug coverage files
-      shell: bash
-      run: |
-        echo "=== Checking test results directory structure ==="
-        find TestResults/${{ matrix.framework }} -type f -name "*coverage*" 2>/dev/null || echo "No coverage files found"
-        echo ""
-        echo "=== All files in TestResults ==="
-        find TestResults/${{ matrix.framework }} -type f 2>/dev/null || echo "No files found"
-        echo ""
-        echo "=== Directory structure ==="
-        ls -la TestResults/${{ matrix.framework }}/ 2>/dev/null || echo "Directory not found"
-
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: test-results-${{ matrix.os }}-${{ matrix.framework }}
-        path: |
-          TestResults/${{ matrix.framework }}/*.trx
-          TestResults/${{ matrix.framework }}/**/coverage.cobertura.xml
-          TestResults/${{ matrix.framework }}/**/coverage.json
-        retention-days: 30
-        if-no-files-found: warn
-
-    - name: Upload detailed coverage reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: coverage-detailed-${{ matrix.os }}-${{ matrix.framework }}
-        path: |
-          TestResults/${{ matrix.framework }}/**/coverage.opencover.xml
-        retention-days: 30
-        if-no-files-found: warn
-
-    - name: Generate coverage summary
-      if: always()
-      shell: bash
-      run: |
-        echo "## Test Coverage Summary for ${{ matrix.display-name }}" >> $GITHUB_STEP_SUMMARY
-        
-        # Find the coverage file
-        COVERAGE_FILE=$(find TestResults/${{ matrix.framework }} -name "coverage.cobertura.xml" 2>/dev/null | head -1)
-        
-        if [ -f "$COVERAGE_FILE" ]; then
-          # Extract coverage percentage using basic tools available in GitHub Actions
-          LINE_RATE=$(grep -o 'line-rate="[^"]*"' "$COVERAGE_FILE" | head -1 | cut -d'"' -f2 2>/dev/null || echo "")
-          BRANCH_RATE=$(grep -o 'branch-rate="[^"]*"' "$COVERAGE_FILE" | head -1 | cut -d'"' -f2 2>/dev/null || echo "")
-          
-          if [ ! -z "$LINE_RATE" ] && [ ! -z "$BRANCH_RATE" ]; then
-            # Try to calculate percentages, fallback to showing raw rates if bc is not available
-            if command -v bc >/dev/null 2>&1; then
-              LINE_PERCENT=$(echo "$LINE_RATE * 100" | bc -l 2>/dev/null | cut -d'.' -f1 2>/dev/null || echo "0")
-              BRANCH_PERCENT=$(echo "$BRANCH_RATE * 100" | bc -l 2>/dev/null | cut -d'.' -f1 2>/dev/null || echo "0")
-              echo "- **Line Coverage**: ${LINE_PERCENT}%" >> $GITHUB_STEP_SUMMARY
-              echo "- **Branch Coverage**: ${BRANCH_PERCENT}%" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "- **Line Coverage**: ${LINE_RATE} (raw rate)" >> $GITHUB_STEP_SUMMARY
-              echo "- **Branch Coverage**: ${BRANCH_RATE} (raw rate)" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "- Coverage data available in artifacts" >> $GITHUB_STEP_SUMMARY
-          fi
-        else
-          echo "- Coverage file not found" >> $GITHUB_STEP_SUMMARY
-        fi
-
-    - name: Publish test results summary
-      if: always()
-      shell: bash
-      run: |
-        echo "## Test Results Summary for ${{ matrix.display-name }}" >> $GITHUB_STEP_SUMMARY
-        
-        # Count test result files
-        UNIT_TESTS=$(find TestResults/${{ matrix.framework }} -name "unit-tests-*.trx" | wc -l)
-        PROPERTY_TESTS=$(find TestResults/${{ matrix.framework }} -name "property-tests-*.trx" | wc -l)
-        ALL_TESTS=$(find TestResults/${{ matrix.framework }} -name "test-results-*.trx" | wc -l)
-        
-        echo "- **Unit Test Files**: $UNIT_TESTS" >> $GITHUB_STEP_SUMMARY
-        echo "- **Property Test Files**: $PROPERTY_TESTS" >> $GITHUB_STEP_SUMMARY  
-        echo "- **Total Test Files**: $ALL_TESTS" >> $GITHUB_STEP_SUMMARY
-        
-        # Check for test failures by examining TRX files
-        if find TestResults/${{ matrix.framework }} -name "*.trx" -exec grep -l "outcome=\"Failed\"" {} \; 2>/dev/null | head -1 > /dev/null 2>&1; then
-          echo "- **Status**: ❌ Some tests failed" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- **Status**: ✅ All tests passed" >> $GITHUB_STEP_SUMMARY
-        fi
-
-  test-reporting:
-    name: Consolidate Test Reports
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    if: always()
-    
-    steps:
-    - name: Download all test artifacts
-      uses: actions/download-artifact@v4
-      continue-on-error: true
-      with:
-        pattern: test-results-*
-        path: ./all-test-results
-        merge-multiple: true
-
-    - name: Download all coverage artifacts  
-      uses: actions/download-artifact@v4
-      continue-on-error: true
-      with:
-        pattern: coverage-*
-        path: ./all-coverage-results
-        merge-multiple: true
-
-    - name: Install report generator
-      shell: bash
-      run: |
-        dotnet tool install -g dotnet-reportgenerator-globaltool
-
-    - name: Generate consolidated coverage report
-      shell: bash
-      run: |
-        mkdir -p ./coverage-report
-        
-        # Check if coverage results directory exists
-        if [ ! -d "./all-coverage-results" ]; then
-          echo "## 📊 Consolidated Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "No coverage results directory found. This may indicate that tests failed or coverage was not collected." >> $GITHUB_STEP_SUMMARY
-          exit 0
-        fi
-        
-        # Debug: Show what we downloaded
-        echo "=== Downloaded coverage artifacts ==="
-        find ./all-coverage-results -type f 2>/dev/null || echo "No files in coverage results"
-        
-        # Find all coverage files
-        find ./all-coverage-results -name "coverage.cobertura.xml" -o -name "coverage.opencover.xml" > coverage-files.txt 2>/dev/null || touch coverage-files.txt
-        
-        echo "=== Coverage files found ==="
-        cat coverage-files.txt || echo "No coverage files list"
-        
-        if [ -s coverage-files.txt ]; then
-          # Generate HTML report
-          COVERAGE_REPORTS=$(cat coverage-files.txt | tr '\n' ';' 2>/dev/null || echo "")
-          if [ ! -z "$COVERAGE_REPORTS" ]; then
-            echo "Generating coverage report with: $COVERAGE_REPORTS"
-            reportgenerator -reports:"$COVERAGE_REPORTS" -targetdir:./coverage-report -reporttypes:"Html;Badges;TextSummary" -title:"JsonToolkit.STJ Coverage Report" -tag:"${{ github.run_number }}" 2>/dev/null || echo "Report generation failed"
-          fi
-            
-          echo "## 📊 Consolidated Coverage Report" >> $GITHUB_STEP_SUMMARY
-          
-          # Extract summary from TextSummary report
-          if [ -f "./coverage-report/Summary.txt" ]; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat "./coverage-report/Summary.txt" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-        else
-          echo "## 📊 Consolidated Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "No coverage files found in artifacts" >> $GITHUB_STEP_SUMMARY
-        fi
-
-    - name: Upload consolidated coverage report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: consolidated-coverage-report
-        path: ./coverage-report/
-        retention-days: 90
-        if-no-files-found: warn
-
-    - name: Generate test summary report
-      shell: bash
-      run: |
-        echo "## 🧪 Test Execution Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Check if test results directory exists
-        if [ ! -d "./all-test-results" ]; then
-          echo "No test results directory found. This may indicate that tests failed or artifacts were not uploaded." >> $GITHUB_STEP_SUMMARY
-          exit 0
-        fi
-        
-        # Count total test result files
-        TOTAL_TRX_FILES=$(find ./all-test-results -name "*.trx" 2>/dev/null | wc -l)
-        echo "**Total test result files**: $TOTAL_TRX_FILES" >> $GITHUB_STEP_SUMMARY
-        
-        # List all matrix combinations that ran
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Test Matrix Results**:" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "$TOTAL_TRX_FILES" -gt 0 ]; then
-          for trx_file in $(find ./all-test-results -name "*.trx" 2>/dev/null); do
-            filename=$(basename "$trx_file")
-            echo "- $filename" >> $GITHUB_STEP_SUMMARY
-          done
-        else
-          echo "- No test result files found" >> $GITHUB_STEP_SUMMARY
-        fi
-
-  build-artifacts:
-    name: Build Artifacts
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          6.0.x
-          8.0.x
-        dotnet-quality: 'ga'
-
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
-
-    - name: Restore dependencies
-      run: dotnet restore
-
-    - name: Build release
-      run: |
-        # Use a CI-friendly version for release builds
-        CI_VERSION="1.0.0-ci.${{ github.run_number }}"
-        echo "Building release with CI version: $CI_VERSION"
-        dotnet build --no-restore --configuration Release -p:Version=$CI_VERSION -p:AssemblyVersion=1.0.0.0 -p:FileVersion=1.0.0.${{ github.run_number }} -p:InformationalVersion=$CI_VERSION
-
-    - name: Create NuGet package
-      run: |
-        CI_VERSION="1.0.0-ci.${{ github.run_number }}"
-        dotnet pack --no-build --configuration Release --output ./artifacts -p:PackageVersion=$CI_VERSION
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: nuget-packages
-        path: ./artifacts/*.nupkg
-        retention-days: 90
-        if-no-files-found: error
-
-  status-check:
-    name: Status Check
-    runs-on: ubuntu-latest
-    needs: [build-and-test, build-artifacts, test-reporting]
-    if: always()
-    
-    steps:
-    - name: Check build status
-      shell: bash
-      run: |
-        echo "## 🔍 Pipeline Status Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        # Check individual job statuses
-        BUILD_TEST_STATUS="${{ needs.build-and-test.result }}"
-        BUILD_ARTIFACTS_STATUS="${{ needs.build-artifacts.result }}"
-        TEST_REPORTING_STATUS="${{ needs.test-reporting.result }}"
-        
-        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
-        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-        echo "| Build and Test | $BUILD_TEST_STATUS |" >> $GITHUB_STEP_SUMMARY
-        echo "| Build Artifacts | $BUILD_ARTIFACTS_STATUS |" >> $GITHUB_STEP_SUMMARY
-        echo "| Test Reporting | $TEST_REPORTING_STATUS |" >> $GITHUB_STEP_SUMMARY
-        
-        if [[ "$BUILD_TEST_STATUS" == "success" && "$BUILD_ARTIFACTS_STATUS" == "success" ]]; then
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **All critical checks passed**" >> $GITHUB_STEP_SUMMARY
-          exit 0
-        else
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "❌ **Some critical checks failed**" >> $GITHUB_STEP_SUMMARY
-          echo "- Build and test: $BUILD_TEST_STATUS" >> $GITHUB_STEP_SUMMARY
-          echo "- Build artifacts: $BUILD_ARTIFACTS_STATUS" >> $GITHUB_STEP_SUMMARY
-          exit 1
-        fi
+        dotnet test -c Release --no-build \
+          --framework ${{ matrix.framework }} \
+          --logger "trx"
