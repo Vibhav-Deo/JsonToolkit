@@ -6,22 +6,68 @@
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn> <!-- Missing XML comment warnings -->
+    
+    <!-- Assembly Information -->
+    <AssemblyTitle>JsonToolkit.STJ</AssemblyTitle>
+    <AssemblyDescription>Enhanced System.Text.Json with Newtonsoft.Json-like convenience features</AssemblyDescription>
+    <AssemblyCompany>JsonToolkit Contributors</AssemblyCompany>
+    <AssemblyProduct>JsonToolkit.STJ</AssemblyProduct>
+    <AssemblyCopyright>Copyright (c) 2024 JsonToolkit Contributors</AssemblyCopyright>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
     
     <!-- NuGet Package Metadata -->
     <PackageId>JsonToolkit.STJ</PackageId>
     <PackageVersion>1.0.0</PackageVersion>
-    <Title>JsonToolkit.STJ</Title>
+    <Title>JsonToolkit.STJ - Enhanced System.Text.Json</Title>
     <Authors>JsonToolkit Contributors</Authors>
-    <Description>Drop-in helpers to address common pain points when working with System.Text.Json in .NET applications. Provides Newtonsoft.Json-like conveniences while maintaining System.Text.Json performance benefits.</Description>
-    <Summary>Enhanced System.Text.Json with Newtonsoft.Json-like convenience features</Summary>
-    <PackageTags>json;system.text.json;newtonsoft;serialization;deserialization;dotnet</PackageTags>
+    <Owners>JsonToolkit Contributors</Owners>
+    <Description>Drop-in helpers to address common pain points when working with System.Text.Json in .NET applications. Provides Newtonsoft.Json-like conveniences including deep merge, JSON patch, polymorphic deserialization, flexible enums, optional property defaults, case-insensitive matching, JsonPath queries, LINQ-to-JSON, and comprehensive validation - all while maintaining System.Text.Json's performance benefits.</Description>
+    <Summary>Enhanced System.Text.Json with Newtonsoft.Json-like convenience features for deep merge, JSON patch, polymorphic types, validation, and more</Summary>
+    <PackageTags>json;system-text-json;newtonsoft;serialization;deserialization;dotnet;csharp;json-patch;json-path;linq;validation;polymorphic;merge;performance</PackageTags>
     <PackageProjectUrl>https://github.com/jsontoolkit/jsontoolkit-stj</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/jsontoolkit/jsontoolkit-stj</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/jsontoolkit/jsontoolkit-stj.git</RepositoryUrl>
+    <RepositoryBranch>main</RepositoryBranch>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <Copyright>Copyright (c) JsonToolkit Contributors</Copyright>
-    <PackageReleaseNotes>Initial release with core JSON processing enhancements for System.Text.Json</PackageReleaseNotes>
+    <Copyright>Copyright (c) 2024 JsonToolkit Contributors</Copyright>
+    <PackageReleaseNotes>
+      v1.0.0 - Initial Release
+      • Deep merge functionality for JSON objects with conflict resolution
+      • JSON Patch operations (add, remove, replace, move, copy, test)
+      • Polymorphic deserialization with type discriminators
+      • Optional property defaults system
+      • Case-insensitive property matching
+      • Flexible enum serialization (string/numeric with case-insensitive matching)
+      • Enhanced null handling (distinguish missing vs null vs default)
+      • JsonPath query engine with wildcards and filters
+      • LINQ-to-JSON extensions for querying and transformation
+      • JSON Schema validation with comprehensive error reporting
+      • Configuration file support with environment-specific overrides
+      • Object transformation/mapping through JSON
+      • Validation attributes for declarative constraints
+      • Modern C# support (records, init-only properties, immutable collections)
+      • Newtonsoft.Json-style extension methods (ToJson, FromJson, DeepClone)
+      • JElement class for dynamic JSON access
+      • Multi-framework support (.NET Framework 4.6.2+, .NET Standard 2.0, .NET 6.0+)
+      • Comprehensive error handling with detailed context information
+      • High performance with System.Text.Json foundation
+    </PackageReleaseNotes>
+    
+    <!-- Package Icon and Documentation -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    
+    <!-- Deterministic builds -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
   <!-- Conditional Compilation Symbols -->
@@ -41,21 +87,37 @@
     <DefineConstants>$(DefineConstants);NET8_0</DefineConstants>
   </PropertyGroup>
 
-  <!-- Package Dependencies -->
+  <!-- Package Dependencies with proper version constraints -->
   <ItemGroup>
-    <PackageReference Include="System.Text.Json" Version="8.0.0" />
-    <PackageReference Include="System.Collections.Immutable" Version="8.0.0" />
+    <!-- Core System.Text.Json - minimum version for consistent API surface -->
+    <PackageReference Include="System.Text.Json" Version="[6.0.0,)" />
+    <!-- Immutable collections for modern C# support -->
+    <PackageReference Include="System.Collections.Immutable" Version="[6.0.0,)" />
+    <!-- Source link for debugging support -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
   </ItemGroup>
 
-  <!-- .NET Framework specific dependencies -->
+  <!-- .NET Framework 4.6.2 specific dependencies -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net462'">
-    <PackageReference Include="System.Memory" Version="4.5.5" />
-    <PackageReference Include="System.Buffers" Version="4.5.1" />
+    <!-- Required for System.Text.Json on .NET Framework -->
+    <PackageReference Include="System.Memory" Version="[4.5.5,)" />
+    <PackageReference Include="System.Buffers" Version="[4.5.1,)" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="[6.0.0,)" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="[4.5.4,)" />
+    <PackageReference Include="System.ValueTuple" Version="[4.5.0,)" />
   </ItemGroup>
 
   <!-- .NET Standard 2.0 specific dependencies -->
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-    <PackageReference Include="System.Memory" Version="4.5.5" />
+    <!-- Memory and span support for .NET Standard 2.0 -->
+    <PackageReference Include="System.Memory" Version="[4.5.5,)" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="[6.0.0,)" />
+  </ItemGroup>
+
+  <!-- Package content files -->
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
