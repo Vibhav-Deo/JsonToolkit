@@ -29,7 +29,7 @@ jobs:
             framework: net6.0
             display-name: 'Linux .NET 6.0'
           - os: windows-latest
-            dotnet-version: '4.6.2'
+            dotnet-version: '8.0.x'
             framework: net462
             display-name: 'Windows .NET Framework 4.6.2'
 
@@ -61,24 +61,31 @@ jobs:
     - name: Build solution
       run: dotnet build --no-restore --configuration Debug
 
-    - name: Run all tests with comprehensive reporting
+    - name: Run all tests with coverage collection
       shell: bash
       run: |
         # Create test results directory
         mkdir -p TestResults/${{ matrix.framework }}
         
-        # Run all tests with detailed logging and coverage
-        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} --logger "trx;LogFileName=test-results-${{ matrix.framework }}.trx" --logger "console;verbosity=detailed" --results-directory TestResults/${{ matrix.framework }} --collect:"XPlat Code Coverage" --settings coverlet.runsettings -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[JsonToolkit.STJ]*" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[JsonToolkit.STJ.Tests]*"
+        # Run all tests once with coverage collection using the runsettings file
+        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} \
+          --logger "trx;LogFileName=test-results-${{ matrix.framework }}.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory TestResults/${{ matrix.framework }} \
+          --collect:"XPlat Code Coverage" \
+          --settings coverlet.runsettings
 
-    - name: Run unit tests separately for detailed reporting
+    - name: Debug coverage files
       shell: bash
       run: |
-        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} --logger "trx;LogFileName=unit-tests-${{ matrix.framework }}.trx" --results-directory TestResults/${{ matrix.framework }} --filter "Category!=Property" --collect:"XPlat Code Coverage"
-
-    - name: Run property-based tests separately with extended timeout
-      shell: bash
-      run: |
-        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} --logger "trx;LogFileName=property-tests-${{ matrix.framework }}.trx" --results-directory TestResults/${{ matrix.framework }} --filter "Category=Property" --collect:"XPlat Code Coverage" -- RunConfiguration.TestSessionTimeout=600000
+        echo "=== Checking test results directory structure ==="
+        find TestResults/${{ matrix.framework }} -type f -name "*coverage*" 2>/dev/null || echo "No coverage files found"
+        echo ""
+        echo "=== All files in TestResults ==="
+        find TestResults/${{ matrix.framework }} -type f 2>/dev/null || echo "No files found"
+        echo ""
+        echo "=== Directory structure ==="
+        ls -la TestResults/${{ matrix.framework }}/ 2>/dev/null || echo "Directory not found"
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -90,6 +97,7 @@ jobs:
           TestResults/${{ matrix.framework }}/**/coverage.cobertura.xml
           TestResults/${{ matrix.framework }}/**/coverage.json
         retention-days: 30
+        if-no-files-found: warn
 
     - name: Upload detailed coverage reports
       uses: actions/upload-artifact@v4
@@ -99,6 +107,7 @@ jobs:
         path: |
           TestResults/${{ matrix.framework }}/**/coverage.opencover.xml
         retention-days: 30
+        if-no-files-found: warn
 
     - name: Generate coverage summary
       if: always()
@@ -194,13 +203,21 @@ jobs:
           exit 0
         fi
         
+        # Debug: Show what we downloaded
+        echo "=== Downloaded coverage artifacts ==="
+        find ./all-coverage-results -type f 2>/dev/null || echo "No files in coverage results"
+        
         # Find all coverage files
         find ./all-coverage-results -name "coverage.cobertura.xml" -o -name "coverage.opencover.xml" > coverage-files.txt 2>/dev/null || touch coverage-files.txt
+        
+        echo "=== Coverage files found ==="
+        cat coverage-files.txt || echo "No coverage files list"
         
         if [ -s coverage-files.txt ]; then
           # Generate HTML report
           COVERAGE_REPORTS=$(cat coverage-files.txt | tr '\n' ';' 2>/dev/null || echo "")
           if [ ! -z "$COVERAGE_REPORTS" ]; then
+            echo "Generating coverage report with: $COVERAGE_REPORTS"
             reportgenerator -reports:"$COVERAGE_REPORTS" -targetdir:./coverage-report -reporttypes:"Html;Badges;TextSummary" -title:"JsonToolkit.STJ Coverage Report" -tag:"${{ github.run_number }}" 2>/dev/null || echo "Report generation failed"
           fi
             
@@ -224,6 +241,7 @@ jobs:
         name: consolidated-coverage-report
         path: ./coverage-report/
         retention-days: 90
+        if-no-files-found: warn
 
     - name: Generate test summary report
       shell: bash
@@ -296,6 +314,7 @@ jobs:
         name: nuget-packages
         path: ./artifacts/*.nupkg
         retention-days: 90
+        if-no-files-found: error
 
   status-check:
     name: Status Check

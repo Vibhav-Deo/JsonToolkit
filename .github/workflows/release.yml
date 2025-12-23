@@ -179,6 +179,7 @@ jobs:
           TestResults/Release/${{ matrix.framework }}/*.trx
           TestResults/Release/${{ matrix.framework }}/**/coverage.cobertura.xml
         retention-days: 90
+        if-no-files-found: warn
 
     - name: Validate test results
       shell: bash
@@ -307,6 +308,7 @@ jobs:
           ./release-artifacts/*.nupkg
           ./release-artifacts/checksums.txt
         retention-days: 90
+        if-no-files-found: error
 
   publish-nuget:
     name: Publish to NuGet.org
