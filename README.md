@@ -210,6 +210,56 @@ JsonToolkit.STJ maintains System.Text.Json's performance characteristics while a
 | .NET Core | 3.1+ | ✅ Supported |
 | .NET | 5.0+ | ✅ Supported |
 
+## 🚀 CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and automated NuGet publishing with modern security practices.
+
+### Build Status
+
+[![CI](https://github.com/your-username/JsonToolkit.STJ/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/JsonToolkit.STJ/actions/workflows/ci.yml)
+[![Release](https://github.com/your-username/JsonToolkit.STJ/actions/workflows/release.yml/badge.svg)](https://github.com/your-username/JsonToolkit.STJ/actions/workflows/release.yml)
+
+### Features
+
+- **🔒 Secure Publishing**: Uses NuGet Trusted Publishing with OIDC (no API keys stored)
+- **🧪 Comprehensive Testing**: Unit tests and property-based tests across multiple frameworks
+- **📊 Coverage Reports**: Automated code coverage reporting and artifact collection
+- **🏗️ Multi-Framework Builds**: Tests on .NET Framework 4.6.2, .NET 6.0, and .NET 8.0
+- **⚡ Optimized Performance**: Efficient caching and parallel execution
+- **📦 Automated Releases**: Version tags trigger automatic NuGet publishing
+
+### NuGet Trusted Publishing
+
+This repository uses **NuGet Trusted Publishing** with OpenID Connect (OIDC) for secure, keyless package publishing:
+
+- **No API Keys**: No sensitive credentials stored in repository secrets
+- **Enhanced Security**: Short-lived tokens generated automatically by GitHub
+- **Audit Trail**: Complete publishing history with GitHub Actions logs
+- **Zero Maintenance**: No key rotation or secret management required
+
+For setup instructions, see [NuGet Trusted Publishing Guide](docs/NUGET_TRUSTED_PUBLISHING.md).
+
+### Release Process
+
+1. **Create Version Tag**: Push a tag in format `v{MAJOR}.{MINOR}.{PATCH}` (e.g., `v1.2.3`)
+2. **Automated Build**: GitHub Actions builds and tests across all target frameworks
+3. **Package Creation**: NuGet package created with proper versioning and metadata
+4. **Secure Publishing**: Package published to NuGet.org using OIDC authentication
+5. **GitHub Release**: Automated GitHub release created with artifacts and checksums
+
+### Development Workflow
+
+```bash
+# Run tests locally
+dotnet test
+
+# Build release package
+dotnet pack --configuration Release
+
+# Validate OIDC setup (in GitHub Actions)
+./scripts/validate-oidc-setup.sh
+```
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.

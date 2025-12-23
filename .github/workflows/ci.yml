@@ -1,0 +1,319 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            dotnet-version: '8.0.x'
+            framework: net8.0
+            display-name: 'Linux .NET 8.0'
+          - os: ubuntu-latest
+            dotnet-version: '6.0.x'
+            framework: net6.0
+            display-name: 'Linux .NET 6.0'
+          - os: windows-latest
+            dotnet-version: '4.6.2'
+            framework: net462
+            display-name: 'Windows .NET Framework 4.6.2'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          6.0.x
+          8.0.x
+        dotnet-quality: 'ga'
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build solution
+      run: dotnet build --no-restore --configuration Debug
+
+    - name: Run all tests with comprehensive reporting
+      run: |
+        # Create test results directory
+        mkdir -p TestResults/${{ matrix.framework }}
+        
+        # Run all tests with detailed logging and coverage
+        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} \
+          --logger "trx;LogFileName=test-results-${{ matrix.framework }}.trx" \
+          --logger "console;verbosity=detailed" \
+          --results-directory TestResults/${{ matrix.framework }} \
+          --collect:"XPlat Code Coverage" \
+          --settings coverlet.runsettings \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[JsonToolkit.STJ]*" \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[JsonToolkit.STJ.Tests]*"
+
+    - name: Run unit tests separately for detailed reporting
+      run: |
+        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} \
+          --logger "trx;LogFileName=unit-tests-${{ matrix.framework }}.trx" \
+          --results-directory TestResults/${{ matrix.framework }} \
+          --filter "Category!=Property" \
+          --collect:"XPlat Code Coverage"
+
+    - name: Run property-based tests separately with extended timeout
+      run: |
+        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} \
+          --logger "trx;LogFileName=property-tests-${{ matrix.framework }}.trx" \
+          --results-directory TestResults/${{ matrix.framework }} \
+          --filter "Category=Property" \
+          --collect:"XPlat Code Coverage" \
+          -- RunConfiguration.TestSessionTimeout=600000
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.os }}-${{ matrix.framework }}
+        path: |
+          TestResults/${{ matrix.framework }}/*.trx
+          TestResults/${{ matrix.framework }}/**/coverage.cobertura.xml
+          TestResults/${{ matrix.framework }}/**/coverage.json
+        retention-days: 30
+
+    - name: Upload detailed coverage reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-detailed-${{ matrix.os }}-${{ matrix.framework }}
+        path: |
+          TestResults/${{ matrix.framework }}/**/coverage.opencover.xml
+        retention-days: 30
+
+    - name: Generate coverage summary
+      if: always()
+      run: |
+        echo "## Test Coverage Summary for ${{ matrix.display-name }}" >> $GITHUB_STEP_SUMMARY
+        
+        # Find the coverage file
+        COVERAGE_FILE=$(find TestResults/${{ matrix.framework }} -name "coverage.cobertura.xml" | head -1)
+        
+        if [ -f "$COVERAGE_FILE" ]; then
+          # Extract coverage percentage using basic tools available in GitHub Actions
+          LINE_RATE=$(grep -o 'line-rate="[^"]*"' "$COVERAGE_FILE" | head -1 | cut -d'"' -f2)
+          BRANCH_RATE=$(grep -o 'branch-rate="[^"]*"' "$COVERAGE_FILE" | head -1 | cut -d'"' -f2)
+          
+          if [ ! -z "$LINE_RATE" ] && [ ! -z "$BRANCH_RATE" ]; then
+            LINE_PERCENT=$(echo "$LINE_RATE * 100" | bc -l | cut -d'.' -f1)
+            BRANCH_PERCENT=$(echo "$BRANCH_RATE * 100" | bc -l | cut -d'.' -f1)
+            
+            echo "- **Line Coverage**: ${LINE_PERCENT}%" >> $GITHUB_STEP_SUMMARY
+            echo "- **Branch Coverage**: ${BRANCH_PERCENT}%" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Coverage data available in artifacts" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "- Coverage file not found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Publish test results summary
+      if: always()
+      run: |
+        echo "## Test Results Summary for ${{ matrix.display-name }}" >> $GITHUB_STEP_SUMMARY
+        
+        # Count test result files
+        UNIT_TESTS=$(find TestResults/${{ matrix.framework }} -name "unit-tests-*.trx" | wc -l)
+        PROPERTY_TESTS=$(find TestResults/${{ matrix.framework }} -name "property-tests-*.trx" | wc -l)
+        ALL_TESTS=$(find TestResults/${{ matrix.framework }} -name "test-results-*.trx" | wc -l)
+        
+        echo "- **Unit Test Files**: $UNIT_TESTS" >> $GITHUB_STEP_SUMMARY
+        echo "- **Property Test Files**: $PROPERTY_TESTS" >> $GITHUB_STEP_SUMMARY  
+        echo "- **Total Test Files**: $ALL_TESTS" >> $GITHUB_STEP_SUMMARY
+        
+        # Check for test failures by examining TRX files
+        if find TestResults/${{ matrix.framework }} -name "*.trx" -exec grep -l "outcome=\"Failed\"" {} \; | head -1 > /dev/null; then
+          echo "- **Status**: ❌ Some tests failed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status**: ✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  test-reporting:
+    name: Consolidate Test Reports
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: always()
+    
+    steps:
+    - name: Download all test artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: test-results-*
+        path: ./all-test-results
+        merge-multiple: true
+
+    - name: Download all coverage artifacts  
+      uses: actions/download-artifact@v4
+      with:
+        pattern: coverage-*
+        path: ./all-coverage-results
+        merge-multiple: true
+
+    - name: Install report generator
+      run: |
+        dotnet tool install -g dotnet-reportgenerator-globaltool
+
+    - name: Generate consolidated coverage report
+      run: |
+        mkdir -p ./coverage-report
+        
+        # Find all coverage files
+        find ./all-coverage-results -name "coverage.cobertura.xml" -o -name "coverage.opencover.xml" > coverage-files.txt
+        
+        if [ -s coverage-files.txt ]; then
+          # Generate HTML report
+          reportgenerator \
+            -reports:"$(cat coverage-files.txt | tr '\n' ';')" \
+            -targetdir:./coverage-report \
+            -reporttypes:"Html;Badges;TextSummary" \
+            -title:"JsonToolkit.STJ Coverage Report" \
+            -tag:"${{ github.run_number }}"
+            
+          echo "## 📊 Consolidated Coverage Report" >> $GITHUB_STEP_SUMMARY
+          
+          # Extract summary from TextSummary report
+          if [ -f "./coverage-report/Summary.txt" ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat "./coverage-report/Summary.txt" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "No coverage files found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload consolidated coverage report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: consolidated-coverage-report
+        path: ./coverage-report/
+        retention-days: 90
+
+    - name: Generate test summary report
+      run: |
+        echo "## 🧪 Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Count total test result files
+        TOTAL_TRX_FILES=$(find ./all-test-results -name "*.trx" | wc -l)
+        echo "**Total test result files**: $TOTAL_TRX_FILES" >> $GITHUB_STEP_SUMMARY
+        
+        # List all matrix combinations that ran
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Test Matrix Results**:" >> $GITHUB_STEP_SUMMARY
+        
+        for trx_file in $(find ./all-test-results -name "*.trx"); do
+          filename=$(basename "$trx_file")
+          echo "- $filename" >> $GITHUB_STEP_SUMMARY
+        done
+
+  build-artifacts:
+    name: Build Artifacts
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: |
+          6.0.x
+          8.0.x
+        dotnet-quality: 'ga'
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build release
+      run: dotnet build --no-restore --configuration Release
+
+    - name: Create NuGet package
+      run: dotnet pack --no-build --configuration Release --output ./artifacts
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget-packages
+        path: ./artifacts/*.nupkg
+        retention-days: 90
+
+  status-check:
+    name: Status Check
+    runs-on: ubuntu-latest
+    needs: [build-and-test, build-artifacts, test-reporting]
+    if: always()
+    
+    steps:
+    - name: Check build status
+      run: |
+        echo "## 🔍 Pipeline Status Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Check individual job statuses
+        BUILD_TEST_STATUS="${{ needs.build-and-test.result }}"
+        BUILD_ARTIFACTS_STATUS="${{ needs.build-artifacts.result }}"
+        TEST_REPORTING_STATUS="${{ needs.test-reporting.result }}"
+        
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Build and Test | $BUILD_TEST_STATUS |" >> $GITHUB_STEP_SUMMARY
+        echo "| Build Artifacts | $BUILD_ARTIFACTS_STATUS |" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Reporting | $TEST_REPORTING_STATUS |" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "$BUILD_TEST_STATUS" == "success" && "$BUILD_ARTIFACTS_STATUS" == "success" ]]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **All critical checks passed**" >> $GITHUB_STEP_SUMMARY
+          exit 0
+        else
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "❌ **Some critical checks failed**" >> $GITHUB_STEP_SUMMARY
+          echo "- Build and test: $BUILD_TEST_STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "- Build artifacts: $BUILD_ARTIFACTS_STATUS" >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi
