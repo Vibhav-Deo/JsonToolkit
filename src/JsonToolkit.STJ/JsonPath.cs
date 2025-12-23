@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 
 namespace JsonToolkit.STJ
 {
@@ -241,7 +238,7 @@ namespace JsonToolkit.STJ
             var actualValue = property.ValueKind switch
             {
                 JsonValueKind.String => property.GetString(),
-                JsonValueKind.Number => property.GetDouble().ToString(),
+                JsonValueKind.Number => property.GetDouble().ToString(System.Globalization.CultureInfo.InvariantCulture),
                 JsonValueKind.True => "true",
                 JsonValueKind.False => "false",
                 _ => null

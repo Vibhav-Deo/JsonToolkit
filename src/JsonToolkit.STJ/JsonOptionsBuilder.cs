@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using JsonToolkit.STJ.Converters;
 
 namespace JsonToolkit.STJ
@@ -15,8 +11,6 @@ namespace JsonToolkit.STJ
         private readonly JsonSerializerOptions _options;
         private readonly List<JsonConverter> _converters;
         private bool _caseInsensitiveProperties;
-        private bool _flexibleEnums;
-        private readonly Dictionary<Type, object> _optionalDefaults;
         private readonly List<Action<JsonSerializerOptions>> _configurations;
 
         /// <summary>
@@ -26,7 +20,6 @@ namespace JsonToolkit.STJ
         {
             _options = new JsonSerializerOptions();
             _converters = new List<JsonConverter>();
-            _optionalDefaults = new Dictionary<Type, object>();
             _configurations = new List<Action<JsonSerializerOptions>>();
         }
 
@@ -38,7 +31,6 @@ namespace JsonToolkit.STJ
         {
             _options = new JsonSerializerOptions(baseOptions);
             _converters = new List<JsonConverter>();
-            _optionalDefaults = new Dictionary<Type, object>();
             _configurations = new List<Action<JsonSerializerOptions>>();
         }
 
@@ -82,7 +74,6 @@ namespace JsonToolkit.STJ
         /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
         public JsonOptionsBuilder WithFlexibleEnums()
         {
-            _flexibleEnums = true;
             _configurations.Add(options => 
             {
                 // Add a factory converter that creates FlexibleEnumConverter instances for enum types
@@ -98,7 +89,6 @@ namespace JsonToolkit.STJ
         /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
         public JsonOptionsBuilder WithFlexibleEnums(Action<FlexibleEnumOptions> configure)
         {
-            _flexibleEnums = true;
             var options = new FlexibleEnumOptions();
             configure(options);
             
@@ -120,8 +110,6 @@ namespace JsonToolkit.STJ
             if (defaults == null)
                 throw new ArgumentNullException(nameof(defaults));
 
-            _optionalDefaults[typeof(T)] = new OptionalPropertyDefaults<T>(defaults);
-            
             _configurations.Add(options =>
             {
                 // Add or update the OptionalPropertyConverterFactory
@@ -145,8 +133,6 @@ namespace JsonToolkit.STJ
 
             var defaults = new OptionalPropertyDefaults<T>();
             configure(defaults);
-            
-            _optionalDefaults[typeof(T)] = defaults;
             
             _configurations.Add(options =>
             {

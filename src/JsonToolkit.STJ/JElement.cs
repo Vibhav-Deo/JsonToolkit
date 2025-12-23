@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 
 namespace JsonToolkit.STJ
 {
@@ -71,10 +68,19 @@ namespace JsonToolkit.STJ
                 if (_element.ValueKind != JsonValueKind.Array)
                     return null;
 
-                var array = _element.EnumerateArray().ToArray();
-                return index >= 0 && index < array.Length
-                    ? new JElement(array[index])
-                    : null;
+                if (index < 0)
+                    return null;
+
+                var arrayEnumerator = _element.EnumerateArray();
+                var currentIndex = 0;
+                foreach (var item in arrayEnumerator)
+                {
+                    if (currentIndex == index)
+                        return new JElement(item);
+                    currentIndex++;
+                }
+
+                return null;
             }
         }
 
@@ -99,15 +105,12 @@ namespace JsonToolkit.STJ
         /// </summary>
         public IEnumerable<JElement> Children()
         {
-            if (_element.ValueKind == JsonValueKind.Object)
+            return _element.ValueKind switch
             {
-                return _element.EnumerateObject().Select(p => new JElement(p.Value));
-            }
-            else if (_element.ValueKind == JsonValueKind.Array)
-            {
-                return _element.EnumerateArray().Select(e => new JElement(e));
-            }
-            return Enumerable.Empty<JElement>();
+                JsonValueKind.Object => _element.EnumerateObject().Select(p => new JElement(p.Value)),
+                JsonValueKind.Array => _element.EnumerateArray().Select(e => new JElement(e)),
+                _ => Enumerable.Empty<JElement>()
+            };
         }
 
         /// <summary>

@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace JsonToolkit.STJ.Converters
 {
@@ -329,18 +325,19 @@ namespace JsonToolkit.STJ.Converters
             var remainingValue = numericValue;
 
             // Get all defined enum values in descending order (to handle combined flags properly)
+            // Cache the numeric values to avoid repeated Convert.ToInt64 calls
             var definedValues = Enum.GetValues(typeof(T)).Cast<T>()
-                .Where(v => Convert.ToInt64(v, CultureInfo.InvariantCulture) != 0) // Skip zero values for flags
-                .OrderByDescending(v => Convert.ToInt64(v, CultureInfo.InvariantCulture))
+                .Select(v => new { Value = v, Numeric = Convert.ToInt64(v, CultureInfo.InvariantCulture) })
+                .Where(v => v.Numeric != 0) // Skip zero values for flags
+                .OrderByDescending(v => v.Numeric)
                 .ToArray();
 
             foreach (var definedValue in definedValues)
             {
-                var definedNumeric = Convert.ToInt64(definedValue, CultureInfo.InvariantCulture);
-                if ((remainingValue & definedNumeric) == definedNumeric)
+                if ((remainingValue & definedValue.Numeric) == definedValue.Numeric)
                 {
-                    flagNames.Add(_valueToName.TryGetValue(definedValue, out var name) ? name : definedValue.ToString());
-                    remainingValue &= ~definedNumeric;
+                    flagNames.Add(_valueToName.TryGetValue(definedValue.Value, out var name) ? name : definedValue.Value.ToString());
+                    remainingValue &= ~definedValue.Numeric;
                 }
             }
 

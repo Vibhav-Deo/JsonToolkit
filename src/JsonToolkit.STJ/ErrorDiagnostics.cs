@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using JsonToolkit.STJ.Converters;
 
 namespace JsonToolkit.STJ
@@ -405,7 +401,8 @@ namespace JsonToolkit.STJ
             var propertiesWithMultipleErrors = errors
                 .GroupBy(e => e.PropertyPath)
                 .Where(g => g.Count() > 1)
-                .Select(g => g.Key);
+                .Select(g => g.Key)
+                .ToList();
 
             if (propertiesWithMultipleErrors.Any())
             {
@@ -416,7 +413,8 @@ namespace JsonToolkit.STJ
                 .GroupBy(e => e.ErrorType)
                 .Where(g => g.Count() > 1)
                 .OrderByDescending(g => g.Count())
-                .Select(g => $"{g.Key} ({g.Count()} occurrences)");
+                .Select(g => $"{g.Key} ({g.Count()} occurrences)")
+                .ToList();
 
             if (commonErrorTypes.Any())
             {
@@ -426,9 +424,12 @@ namespace JsonToolkit.STJ
             return patterns;
         }
 
-        private static string TruncateJson(string json, int maxLength)
+        private static string TruncateJson(string? json, int maxLength)
         {
-            if (json.Length <= maxLength)
+            if (string.IsNullOrEmpty(json))
+                return string.Empty;
+                
+            if (json!.Length <= maxLength)
                 return json;
 
             return json.Substring(0, maxLength) + "... (truncated)";

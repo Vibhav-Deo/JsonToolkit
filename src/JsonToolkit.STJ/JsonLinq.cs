@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 
 namespace JsonToolkit.STJ
 {
@@ -157,11 +154,19 @@ namespace JsonToolkit.STJ
             if (element.ValueKind != JsonValueKind.Array)
                 return 0;
 
-            var items = element.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Number).ToList();
-            if (items.Count == 0)
-                return 0;
+            double sum = 0;
+            int count = 0;
+            
+            foreach (var item in element.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.Number)
+                {
+                    sum += item.GetDouble();
+                    count++;
+                }
+            }
 
-            return items.Average(e => e.GetDouble());
+            return count == 0 ? 0 : sum / count;
         }
 
         /// <summary>
@@ -172,11 +177,16 @@ namespace JsonToolkit.STJ
             if (element.ValueKind != JsonValueKind.Array)
                 return 0;
 
-            var items = element.EnumerateArray().ToList();
-            if (items.Count == 0)
-                return 0;
+            double sum = 0;
+            int count = 0;
+            
+            foreach (var item in element.EnumerateArray())
+            {
+                sum += selector(item);
+                count++;
+            }
 
-            return items.Average(selector);
+            return count == 0 ? 0 : sum / count;
         }
 
         /// <summary>

@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
-
 namespace JsonToolkit.STJ;
 
 public class JsonSchemaValidator
@@ -100,7 +95,7 @@ public class JsonSchemaValidator
         }
     }
 
-    private bool ValidateType(JsonElement element, string expectedType)
+    private bool ValidateType(JsonElement element, string? expectedType)
     {
         return expectedType?.ToLowerInvariant() switch
         {
@@ -118,7 +113,7 @@ public class JsonSchemaValidator
     private bool IsInteger(JsonElement element)
     {
         if (element.TryGetInt64(out _)) return true;
-        if (element.TryGetDouble(out var d)) return d == Math.Floor(d);
+        if (element.TryGetDouble(out var d)) return Math.Abs(d - Math.Floor(d)) < double.Epsilon;
         return false;
     }
 

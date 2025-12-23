@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using JsonToolkit.STJ.Converters;
 using JsonToolkit.STJ.ValidationAttributes;
 
@@ -85,7 +82,7 @@ namespace JsonToolkit.STJ
         /// <typeparam name="T">The type of object to validate.</typeparam>
         /// <param name="obj">The object to validate.</param>
         /// <returns>A ValidationResult containing any validation errors.</returns>
-        public static ValidationResult Validate<T>(this T obj) where T : class
+        public static ValidationResult Validate<T>(this T? obj) where T : class
         {
             if (obj == null)
                 return ValidationResult.Success();
@@ -138,7 +135,7 @@ namespace JsonToolkit.STJ
         /// <typeparam name="T">The type of object to validate.</typeparam>
         /// <param name="obj">The object to validate.</param>
         /// <exception cref="JsonValidationException">Thrown when validation fails.</exception>
-        public static void ValidateAndThrow<T>(this T obj) where T : class
+        public static void ValidateAndThrow<T>(this T? obj) where T : class
         {
             var result = obj.Validate();
             if (!result.IsValid)
