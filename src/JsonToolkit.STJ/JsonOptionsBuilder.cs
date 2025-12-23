@@ -271,6 +271,18 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Configures date/time format handling.
+        /// </summary>
+        /// <param name="format">The date/time format string.</param>
+        /// <param name="formatProvider">Optional format provider.</param>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithDateTimeFormat(string format, IFormatProvider? formatProvider = null)
+        {
+            _configurations.Add(options => options.WithDateTimeFormat(format, formatProvider));
+            return this;
+        }
+
+        /// <summary>
         /// Applies a custom configuration action to the options.
         /// </summary>
         /// <param name="configure">The configuration action to apply.</param>

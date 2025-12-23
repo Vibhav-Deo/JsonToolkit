@@ -338,6 +338,26 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Configures date/time format handling.
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <param name="format">The date/time format string.</param>
+        /// <param name="formatProvider">Optional format provider.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions WithDateTimeFormat(this JsonSerializerOptions options, string format, IFormatProvider? formatProvider = null)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+            if (format == null)
+                throw new ArgumentNullException(nameof(format));
+
+            options.Converters.Add(new DateTimeFormatConverter(format, formatProvider));
+            options.Converters.Add(new DateTimeOffsetFormatConverter(format, formatProvider));
+
+            return options;
+        }
+
+        /// <summary>
         /// Enables support for modern C# features like records and init-only properties.
         /// </summary>
         /// <param name="options">The JsonSerializerOptions to enhance.</param>
