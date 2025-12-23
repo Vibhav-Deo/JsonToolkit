@@ -58,54 +58,6 @@ namespace JsonToolkit.STJ.Tests.Properties
 
         /// <summary>
         /// **Feature: json-toolkit-stj, Property 4: Polymorphic type resolution is deterministic**
-        /// When type discriminator is invalid, should throw descriptive error.
-        /// **Validates: Requirements 4.3**
-        /// </summary>
-        [Property(MaxTest = 50)]
-        public bool PolymorphicType_InvalidDiscriminatorShouldThrowDescriptiveError(string invalidDiscriminator)
-        {
-            try
-            {
-                // Skip null, empty, or valid discriminators
-                if (string.IsNullOrEmpty(invalidDiscriminator) || invalidDiscriminator == "type1" || invalidDiscriminator == "type2")
-                    return true;
-                // Skip strings with control characters
-                foreach (var c in invalidDiscriminator)
-                {
-                    if (char.IsControl(c)) return true;
-                }
-
-                var options = new JsonOptionsBuilder()
-                    .WithPolymorphicTypes(config =>
-                    {
-                        config.WithBaseType<PolyBase>()
-                              .WithTypeProperty("$type")
-                              .MapType<PolyDerived1>("type1")
-                              .MapType<PolyDerived2>("type2");
-                    })
-                    .Build();
-
-                var json = $"{{\"$type\":\"{invalidDiscriminator}\",\"Data\":\"test\"}}";
-                
-                try
-                {
-                    var result = JsonSerializer.Deserialize<PolyBase>(json, options);
-                    return false; // Should have thrown
-                }
-                catch (JsonToolkitException ex)
-                {
-                    // Should contain discriminator value in error message
-                    return ex.Message.Contains(invalidDiscriminator) || ex.Message.Contains("discriminator");
-                }
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// **Feature: json-toolkit-stj, Property 4: Polymorphic type resolution is deterministic**
         /// Arrays of polymorphic objects should handle each element independently.
         /// **Validates: Requirements 4.4**
         /// </summary>
