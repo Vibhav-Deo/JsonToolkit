@@ -89,6 +89,7 @@ namespace JsonToolkit.STJ.Converters;
             else
             {
                 converterType = typeof(FlexibleEnumConverter<>).MakeGenericType(enumType);
+                // Use the single-parameter constructor since the second parameter is optional
                 constructorArgs = [_defaultOptions];
             }
 

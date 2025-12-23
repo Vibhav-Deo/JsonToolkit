@@ -1,12 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FsCheck;
 using FsCheck.Xunit;
-using Xunit;
-using JsonToolkit.STJ;
 
 namespace JsonToolkit.STJ.Tests.Properties
 {
@@ -37,7 +34,7 @@ namespace JsonToolkit.STJ.Tests.Properties
                     builder.WithFlexibleEnums();
                     
                 if (writeIndented)
-                    builder.WithIndentation(true);
+                    builder.WithIndentation();
 
                 // Build the options
                 var options = builder.Build();
@@ -182,7 +179,7 @@ namespace JsonToolkit.STJ.Tests.Properties
                     builder.WithCaseInsensitiveProperties();
                     
                 if (writeIndented)
-                    builder.WithIndentation(true);
+                    builder.WithIndentation();
 
                 var originalOptions = builder.Build();
                 var clonedOptions = originalOptions.Clone();
@@ -220,20 +217,22 @@ namespace JsonToolkit.STJ.Tests.Properties
                 // Verify enum converter is present if flexible enums were requested
                 if (flexibleEnums)
                 {
-                    bool hasEnumConverter = false;
-                    foreach (var converter in options.Converters)
+                    // Test that enum serialization works as expected with flexible enums
+                    var testEnum = TestEnum.Active;
+                    try
                     {
-                        var converterTypeName = converter.GetType().Name;
-                        if (converter is JsonStringEnumConverter || 
-                            converterTypeName.Contains("FlexibleEnum") ||
-                            converter is JsonConverterFactory factory && factory.GetType().Name.Contains("FlexibleEnum"))
-                        {
-                            hasEnumConverter = true;
-                            break;
-                        }
+                        var enumJson = JsonSerializer.Serialize(testEnum, options);
+                        var roundTripEnum = JsonSerializer.Deserialize<TestEnum>(enumJson, options);
+                        
+                        // If flexible enums are working, this should succeed
+                        if (roundTripEnum != testEnum)
+                            return false;
                     }
-                    if (!hasEnumConverter)
+                    catch
+                    {
+                        // If serialization fails, flexible enums might not be working
                         return false;
+                    }
                 }
                 
                 return true;

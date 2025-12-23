@@ -28,8 +28,16 @@ namespace JsonToolkit.STJ.Converters
         /// Initializes a new instance of the FlexibleEnumConverter class with specified options.
         /// </summary>
         /// <param name="options">The options for enum conversion.</param>
+        public FlexibleEnumConverter(FlexibleEnumOptions options) : this(options, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the FlexibleEnumConverter class with specified options.
+        /// </summary>
+        /// <param name="options">The options for enum conversion.</param>
         /// <param name="fallbackValue">Optional fallback value for this specific enum type.</param>
-        public FlexibleEnumConverter(FlexibleEnumOptions options, T? fallbackValue = null)
+        public FlexibleEnumConverter(FlexibleEnumOptions options, T? fallbackValue)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
             _fallbackValue = fallbackValue;
