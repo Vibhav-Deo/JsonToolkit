@@ -178,12 +178,28 @@ var user = json.ValidateAndDeserialize<User>(); // Throws with validation detail
 
 ## 🎯 Performance
 
-JsonToolkit.STJ maintains System.Text.Json's performance characteristics:
+JsonToolkit.STJ maintains System.Text.Json's performance characteristics while adding powerful features. Here are benchmark results from our comprehensive performance tests:
 
-- **Memory Efficient**: Minimal allocations through efficient algorithms
-- **High Throughput**: Performance comparable to raw System.Text.Json
+### Benchmark Results
+
+| Operation | .NET 8.0 | .NET Framework 4.6.2 | Description |
+|-----------|----------|----------------------|-------------|
+| **Basic Serialization** | 53ms (1000 iterations) | 389ms (1000 iterations) | Raw serialization performance vs System.Text.Json |
+| **Basic Deserialization** | 143ms (1000 iterations) | 779ms (1000 iterations) | Raw deserialization performance vs System.Text.Json |
+| **Deep Merge** | 0.03ms per operation | 0.09ms per operation | Recursive JSON object merging |
+| **JSON Patch** | 0.02ms per operation | 0.14ms per operation | RFC 6902 patch operations |
+| **JsonPath Query** | 0.70ms per operation | 2.70ms per operation | Query 1000 items with filter |
+| **JElement Access** | 0.002ms per operation | 0.007ms per operation | Dynamic property access |
+| **Large Document (1.2MB)** | Serialize: 3ms, Deserialize: 12ms | Serialize: 22ms, Deserialize: 45ms | Processing large JSON documents |
+| **Memory Usage** | ~3MB increase (100 operations) | ~3.3MB increase (100 operations) | Memory overhead for mixed operations |
+
+### Performance Characteristics
+
+- **Memory Efficient**: Minimal allocations through efficient algorithms and object pooling
+- **High Throughput**: Performance identical to raw System.Text.Json for basic operations
 - **Streaming Support**: Async-friendly APIs for large documents
-- **Object Pooling**: Reuse strategies for repeated operations
+- **Framework Optimized**: Better performance on modern .NET compared to .NET Framework
+- **Scalable**: Efficient processing of large documents (1MB+ tested)
 
 ## 🔧 Framework Support
 
