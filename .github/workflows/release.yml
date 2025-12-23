@@ -12,8 +12,8 @@ on:
         type: string
 
 permissions:
-  id-token: write
   contents: read
+  id-token: write   # REQUIRED for NuGet OIDC
 
 env:
   PACKAGE_ID: JsonToolkit.STJ
@@ -22,83 +22,81 @@ env:
 
 jobs:
   release:
+    name: Build, Pack & Publish
     runs-on: ubuntu-latest
     environment: nuget-production
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: |
-          6.0.x
-          8.0.x
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
 
-    - name: Extract version
-      id: version
-      shell: bash
-      run: |
-        # Determine version source
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          VERSION="${{ github.event.inputs.version }}"
-          echo "Using manual version: $VERSION"
-        else
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "Using tag version: $VERSION"
-        fi
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            echo "Using manually provided version: $VERSION"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+            echo "Using tag version: $VERSION"
+          fi
 
-        # Validate version format
-        if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?$ ]]; then
-          echo "❌ Invalid version format: $VERSION"
-          echo "Expected format: {MAJOR}.{MINOR}.{PATCH} or {MAJOR}.{MINOR}.{PATCH}-{PRERELEASE}"
-          exit 1
-        fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected: MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-PRERELEASE"
+            exit 1
+          fi
 
-        echo "✅ Valid version: $VERSION"
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "✅ Version set to $VERSION"
 
-    - name: Restore
-      run: dotnet restore
+      - name: Restore
+        shell: bash
+        run: dotnet restore
 
-    - name: Build
-      shell: bash
-      run: dotnet build -c Release --no-restore -p:Version=$VERSION -p:ContinuousIntegrationBuild=true -p:Deterministic=true -p:RepositoryUrl=https://github.com/${{ github.repository }} -p:RepositoryCommit=${{ github.sha }}
+      - name: Build
+        shell: bash
+        run: |
+          dotnet build -c Release --no-restore \
+            -p:Version=$VERSION \
+            -p:ContinuousIntegrationBuild=true \
+            -p:Deterministic=true \
+            -p:RepositoryUrl=https://github.com/${{ github.repository }} \
+            -p:RepositoryCommit=${{ github.sha }}
 
-    - name: Test
-      shell: bash
-      run: dotnet test -c Release --no-build --framework net8.0
+      - name: Test
+        shell: bash
+        run: dotnet test -c Release --no-build --framework net8.0
 
-    - name: Pack
-      shell: bash
-      run: dotnet pack -c Release --no-build -p:Version=$VERSION -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --output ./artifacts
+      - name: Pack
+        shell: bash
+        run: |
+          dotnet pack -c Release --no-build \
+            -p:Version=$VERSION \
+            -p:IncludeSymbols=true \
+            -p:SymbolPackageFormat=snupkg \
+            --output ./artifacts
 
-    - name: Publish to NuGet (OIDC)
-      shell: bash
-      run: |
-        echo "Publishing to NuGet.org using OIDC authentication..."
-        echo "Repository: ${{ github.repository }}"
-        echo "Environment: ${{ github.environment }}"
-        echo "OIDC Token URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-'Not available'}"
-        echo "OIDC Token Available: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+'Yes'}"
-        
-        # Show NuGet configuration
-        echo "NuGet sources:"
-        dotnet nuget list source
-        
-        # Show package details
-        echo "Package files to publish:"
-        ls -la ./artifacts/
-        
-        echo "Attempting to publish main package..."
-        dotnet nuget push "./artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key PLACEHOLDER --skip-duplicate --verbosity detailed
-        
-        # Only push symbols if main package succeeded
-        if [ $? -eq 0 ]; then
-          echo "Main package published successfully, now publishing symbols..."
-          dotnet nuget push "./artifacts/*.snupkg" --source https://api.nuget.org/v3/index.json --api-key PLACEHOLDER --skip-duplicate --verbosity detailed
-        else
-          echo "Main package publishing failed, skipping symbols"
-          exit 1
-        fi
+      - name: Verify packages
+        shell: bash
+        run: |
+          echo "Packages to publish:"
+          ls -la ./artifacts
+
+      - name: Publish to NuGet.org (OIDC)
+        shell: bash
+        run: |
+          dotnet nuget push "./artifacts/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key PLACEHOLDER \
+            --skip-duplicate
