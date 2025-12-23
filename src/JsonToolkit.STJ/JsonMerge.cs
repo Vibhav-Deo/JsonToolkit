@@ -1,10 +1,10 @@
-namespace JsonToolkit.STJ
+namespace JsonToolkit.STJ;
+
+/// <summary>
+/// Provides deep merge functionality for JSON objects and .NET objects.
+/// </summary>
+public static class JsonMerge
 {
-    /// <summary>
-    /// Provides deep merge functionality for JSON objects and .NET objects.
-    /// </summary>
-    public static class JsonMerge
-    {
         /// <summary>
         /// Performs a deep merge of two JsonElement objects.
         /// </summary>
@@ -235,4 +235,3 @@ namespace JsonToolkit.STJ
             return document.RootElement.Clone();
         }
     }
-}

@@ -1,21 +1,17 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
-using System.Text.Json;
 
-namespace JsonToolkit.STJ
+namespace JsonToolkit.STJ;
+
+/// <summary>
+/// Provides object-to-object transformation capabilities through JSON serialization.
+/// </summary>
+public class JsonMapper
 {
-    /// <summary>
-    /// Provides object-to-object transformation capabilities through JSON serialization.
-    /// </summary>
-    public class JsonMapper
-    {
-        private readonly Dictionary<Type, Dictionary<Type, object>> _configurations = new();
+        private readonly Dictionary<Type, Dictionary<Type, object>> _configurations = [];
         private readonly JsonSerializerOptions _options;
 
-        private JsonMapper(JsonSerializerOptions options = null)
+        private JsonMapper(JsonSerializerOptions? options = null)
         {
             _options = options ?? new JsonSerializerOptions();
         }
@@ -23,7 +19,7 @@ namespace JsonToolkit.STJ
         /// <summary>
         /// Creates a new JsonMapper instance.
         /// </summary>
-        public static JsonMapper Create(JsonSerializerOptions options = null)
+        public static JsonMapper Create(JsonSerializerOptions? options = null)
         {
             return new JsonMapper(options);
         }
@@ -40,7 +36,7 @@ namespace JsonToolkit.STJ
             configure(config);
 
             if (!_configurations.ContainsKey(typeof(TSource)))
-                _configurations[typeof(TSource)] = new Dictionary<Type, object>();
+                _configurations[typeof(TSource)] = [];
 
             _configurations[typeof(TSource)][typeof(TTarget)] = config;
             return this;
@@ -49,10 +45,10 @@ namespace JsonToolkit.STJ
         /// <summary>
         /// Transforms a source object to target type using configured mappings.
         /// </summary>
-        public TTarget Transform<TSource, TTarget>(TSource source)
+        public TTarget? Transform<TSource, TTarget>(TSource source)
         {
             if (source == null)
-                return default(TTarget);
+                return default;
 
             try
             {
@@ -77,15 +73,12 @@ namespace JsonToolkit.STJ
         /// <summary>
         /// Transforms a collection of source objects to target type using configured mappings.
         /// </summary>
-        public IEnumerable<TTarget> Transform<TSource, TTarget>(IEnumerable<TSource> sources)
+        public IEnumerable<TTarget> Transform<TSource, TTarget>(IEnumerable<TSource>? sources)
         {
-            if (sources == null)
-                return Enumerable.Empty<TTarget>();
-
-            return sources.Select(Transform<TSource, TTarget>);
+            return sources?.Select(s => Transform<TSource, TTarget>(s)!) ?? Enumerable.Empty<TTarget>();
         }
 
-        private MappingConfiguration<TSource, TTarget> GetConfiguration<TSource, TTarget>()
+        private MappingConfiguration<TSource, TTarget>? GetConfiguration<TSource, TTarget>()
         {
             if (_configurations.TryGetValue(typeof(TSource), out var targetConfigs) &&
                 targetConfigs.TryGetValue(typeof(TTarget), out var config))
@@ -95,7 +88,7 @@ namespace JsonToolkit.STJ
             return null;
         }
 
-        private TTarget DefaultTransform<TSource, TTarget>(TSource source)
+        private TTarget? DefaultTransform<TSource, TTarget>(TSource source)
         {
             // Default transformation through JSON serialization
             var json = JsonSerializer.Serialize(source, _options);
@@ -108,8 +101,7 @@ namespace JsonToolkit.STJ
     /// </summary>
     public class MappingConfiguration<TSource, TTarget>
     {
-        private readonly List<MemberMapping> _memberMappings = new();
-        private readonly List<ValueResolver> _valueResolvers = new();
+        private readonly List<ValueResolver> _valueResolvers = [];
 
         /// <summary>
         /// Maps a target member using a custom value resolver.
@@ -128,7 +120,7 @@ namespace JsonToolkit.STJ
             return this;
         }
 
-        internal TTarget Transform(TSource source, JsonSerializerOptions options)
+        internal TTarget? Transform(TSource source, JsonSerializerOptions options)
         {
             try
             {
@@ -162,14 +154,12 @@ namespace JsonToolkit.STJ
             if (sourceElement.ValueKind != JsonValueKind.Object)
                 return sourceElement.GetRawText();
 
-            var result = new Dictionary<string, object>();
+            var result = new Dictionary<string, object?>();
 
-            // Apply member mappings
+            // Copy all source properties
             foreach (var prop in sourceElement.EnumerateObject())
             {
-                var mapping = _memberMappings.FirstOrDefault(m => m.SourceName == prop.Name);
-                var targetName = mapping?.TargetName ?? prop.Name;
-                result[targetName] = GetJsonValue(prop.Value);
+                result[prop.Name] = GetJsonValue(prop.Value);
             }
 
             // Apply value resolvers
@@ -177,7 +167,7 @@ namespace JsonToolkit.STJ
             {
                 try
                 {
-                    result[resolver.TargetName] = resolver.Resolver(source);
+                    result[resolver.TargetName] = resolver.Resolver(source!);
                 }
                 catch (Exception ex)
                 {
@@ -192,7 +182,7 @@ namespace JsonToolkit.STJ
             return JsonSerializer.Serialize(result);
         }
 
-        private static object GetJsonValue(JsonElement element)
+        private static object? GetJsonValue(JsonElement element)
         {
             return element.ValueKind switch
             {
@@ -217,30 +207,10 @@ namespace JsonToolkit.STJ
             };
         }
 
-        private class MemberMapping
+        private class ValueResolver(string targetName, Func<object, object?> resolver)
         {
-            public string TargetName { get; }
-            public string SourceName { get; }
-            public Func<object, object> Transform { get; }
-
-            public MemberMapping(string targetName, string sourceName, Func<object, object> transform)
-            {
-                TargetName = targetName;
-                SourceName = sourceName;
-                Transform = transform;
-            }
-        }
-
-        private class ValueResolver
-        {
-            public string TargetName { get; }
-            public Func<object, object> Resolver { get; }
-
-            public ValueResolver(string targetName, Func<object, object> resolver)
-            {
-                TargetName = targetName;
-                Resolver = resolver;
-            }
+            public string TargetName { get; } = targetName;
+            public Func<object, object?> Resolver { get; } = resolver;
         }
     }
 
@@ -252,11 +222,10 @@ namespace JsonToolkit.STJ
         public Type SourceType { get; }
         public Type TargetType { get; }
 
-        public JsonMappingException(string message, Type sourceType, Type targetType, Exception innerException = null)
-            : base(message, innerException)
+        public JsonMappingException(string message, Type sourceType, Type targetType, Exception? innerException = null)
+            : base(message, innerException!)
         {
             SourceType = sourceType;
             TargetType = targetType;
         }
     }
-}

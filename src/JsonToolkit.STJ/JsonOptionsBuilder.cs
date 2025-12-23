@@ -1,13 +1,13 @@
 using System.Linq;
 using JsonToolkit.STJ.Converters;
 
-namespace JsonToolkit.STJ
+namespace JsonToolkit.STJ;
+
+/// <summary>
+/// Fluent builder for configuring JsonSerializerOptions with JsonToolkit.STJ enhancements.
+/// </summary>
+public class JsonOptionsBuilder
 {
-    /// <summary>
-    /// Fluent builder for configuring JsonSerializerOptions with JsonToolkit.STJ enhancements.
-    /// </summary>
-    public class JsonOptionsBuilder
-    {
         private readonly JsonSerializerOptions _options;
         private readonly List<JsonConverter> _converters;
         private bool _caseInsensitiveProperties;
@@ -477,4 +477,3 @@ namespace JsonToolkit.STJ
         /// </summary>
         internal Type? FallbackType => _fallbackType;
     }
-}

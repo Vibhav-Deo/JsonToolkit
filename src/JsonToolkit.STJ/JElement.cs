@@ -1,12 +1,12 @@
 using System.Linq;
 
-namespace JsonToolkit.STJ
+namespace JsonToolkit.STJ;
+
+/// <summary>
+/// Wrapper around JsonElement providing Newtonsoft.Json-like dynamic access.
+/// </summary>
+public class JElement
 {
-    /// <summary>
-    /// Wrapper around JsonElement providing Newtonsoft.Json-like dynamic access.
-    /// </summary>
-    public class JElement
-    {
         private readonly JsonElement _element;
 
         private JElement(JsonElement element)
@@ -152,4 +152,3 @@ namespace JsonToolkit.STJ
             return jElement._element;
         }
     }
-}

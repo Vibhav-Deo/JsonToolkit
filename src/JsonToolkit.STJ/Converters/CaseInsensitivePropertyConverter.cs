@@ -1,13 +1,8 @@
-using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
-namespace JsonToolkit.STJ.Converters
-{
+namespace JsonToolkit.STJ.Converters;
     /// <summary>
     /// Converter that provides enhanced case-insensitive property matching with ambiguity detection.
     /// </summary>
@@ -74,7 +69,7 @@ namespace JsonToolkit.STJ.Converters
                 }
 
                 // Find the matching property using case-insensitive logic
-                var matchedProperty = FindMatchingProperty(propertyName, processedProperties);
+                var matchedProperty = FindMatchingProperty(propertyName!, processedProperties);
                 
                 if (matchedProperty == null)
                 {
@@ -329,4 +324,3 @@ namespace JsonToolkit.STJ.Converters
         /// </summary>
         CurrentCultureIgnoreCase
     }
-}

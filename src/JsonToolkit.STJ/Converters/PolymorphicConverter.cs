@@ -1,10 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace JsonToolkit.STJ.Converters
-{
+namespace JsonToolkit.STJ.Converters;
     /// <summary>
     /// Converter for polymorphic deserialization with type discriminator support.
     /// </summary>
@@ -57,7 +51,7 @@ namespace JsonToolkit.STJ.Converters
                     );
                 }
 
-                if (!_typeMappings.TryGetValue(discriminator, out var targetType))
+                if (!_typeMappings.TryGetValue(discriminator!, out var targetType))
                 {
                     throw new JsonToolkitException(
                         $"Unknown type discriminator value: '{discriminator}'. Valid values are: {string.Join(", ", _typeMappings.Keys)}",
@@ -145,4 +139,3 @@ namespace JsonToolkit.STJ.Converters
             writer.WriteEndObject();
         }
     }
-}

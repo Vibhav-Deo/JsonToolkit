@@ -1,15 +1,10 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
+namespace JsonToolkit.STJ;
 
-namespace JsonToolkit.STJ
+public class ConfigurationBuilder
 {
-    public class ConfigurationBuilder
-    {
-        private readonly List<string> _configSources = new List<string>();
-        private readonly Dictionary<string, string> _fallbacks = new Dictionary<string, string>();
-        private readonly HashSet<string> _maskedPaths = new HashSet<string>();
+        private readonly List<string> _configSources = [];
+        private readonly Dictionary<string, string> _fallbacks = [];
+        private readonly HashSet<string> _maskedPaths = [];
 
         public ConfigurationBuilder AddConfiguration(string json)
         {
@@ -24,7 +19,7 @@ namespace JsonToolkit.STJ
             {
                 var envConfig = ApplyEnvironmentOverride(baseConfig, environment);
                 if (!string.IsNullOrEmpty(envConfig))
-                    _configSources.Add(envConfig);
+                    _configSources.Add(envConfig!);
             }
             return this;
         }
@@ -65,7 +60,8 @@ namespace JsonToolkit.STJ
             if (_fallbacks.Count == 0)
                 return element;
 
-            var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(element.GetRawText());
+            var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(element.GetRawText()) 
+                ?? throw new JsonException("Failed to deserialize configuration element");
             
             foreach (var fallback in _fallbacks)
             {
@@ -83,7 +79,8 @@ namespace JsonToolkit.STJ
             if (_maskedPaths.Count == 0)
                 return element;
 
-            var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(element.GetRawText());
+            var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(element.GetRawText())
+                ?? throw new JsonException("Failed to deserialize configuration element");
             
             foreach (var path in _maskedPaths)
             {
@@ -131,11 +128,10 @@ namespace JsonToolkit.STJ
             }
         }
 
-        private string ApplyEnvironmentOverride(string baseConfig, string environment)
+        private static string? ApplyEnvironmentOverride(string baseConfig, string environment)
         {
             // Placeholder for environment-specific logic
             // In real scenarios, this would load environment-specific files
             return null;
         }
     }
-}

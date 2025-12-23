@@ -1,9 +1,4 @@
-using System;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace JsonToolkit.STJ.Converters
-{
+namespace JsonToolkit.STJ.Converters;
     /// <summary>
     /// Factory for creating FlexibleEnumConverter instances for enum types.
     /// </summary>
@@ -89,12 +84,12 @@ namespace JsonToolkit.STJ.Converters
             if (isNullable)
             {
                 converterType = typeof(NullableFlexibleEnumConverter<>).MakeGenericType(enumType);
-                constructorArgs = new object[] { _defaultOptions };
+                constructorArgs = [_defaultOptions];
             }
             else
             {
                 converterType = typeof(FlexibleEnumConverter<>).MakeGenericType(enumType);
-                constructorArgs = new object[] { _defaultOptions, null };
+                constructorArgs = [_defaultOptions];
             }
 
             // Create converter instance with options
@@ -167,4 +162,3 @@ namespace JsonToolkit.STJ.Converters
                     typeToConvert.GetGenericArguments()[0] == typeof(T));
         }
     }
-}

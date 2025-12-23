@@ -5,9 +5,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using JsonToolkit.STJ.Converters;
 
-namespace JsonToolkit.STJ
-{
-    /// <summary>
+namespace JsonToolkit.STJ;
+
+/// <summary>
     /// Extension methods for enhancing JsonSerializerOptions with JsonToolkit.STJ features.
     /// </summary>
     public static class JsonSerializerOptionsExtensions
@@ -515,4 +515,3 @@ namespace JsonToolkit.STJ
             return factory;
         }
     }
-}

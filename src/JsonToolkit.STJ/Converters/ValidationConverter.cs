@@ -1,13 +1,8 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using JsonToolkit.STJ.ValidationAttributes;
 
-namespace JsonToolkit.STJ.Converters
-{
+namespace JsonToolkit.STJ.Converters;
     /// <summary>
     /// A converter that applies validation attributes during deserialization.
     /// This converter validates properties after deserialization is complete.
@@ -45,7 +40,7 @@ namespace JsonToolkit.STJ.Converters
         /// <param name="typeToConvert">The type to convert.</param>
         /// <param name="options">The serializer options.</param>
         /// <returns>The converted and validated value.</returns>
-        public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override T? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             // Read the JSON into a JsonDocument first
             using var document = JsonDocument.ParseValue(ref reader);
@@ -53,7 +48,7 @@ namespace JsonToolkit.STJ.Converters
             // Deserialize using the default mechanism (without validation converters)
             var json = document.RootElement.GetRawText();
             var tempOptions = CreateOptionsWithoutValidation(options);
-            var result = JsonSerializer.Deserialize<T>(json, tempOptions)!;
+            var result = JsonSerializer.Deserialize<T>(json, tempOptions);
 
             // Apply validation if enabled
             if (_options.EnableValidation && result != null)
@@ -212,4 +207,3 @@ namespace JsonToolkit.STJ.Converters
             // For now, we'll just ignore this functionality as it's not critical for basic validation.
         }
     }
-}

@@ -5,9 +5,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace JsonToolkit.STJ
-{
-    /// <summary>
+namespace JsonToolkit.STJ;
+
+/// <summary>
     /// Enhanced JsonSerializer static methods with improved error handling and context information.
     /// Provides System.Text.Json-style API with JsonToolkit.STJ enhancements.
     /// </summary>
@@ -486,4 +486,3 @@ namespace JsonToolkit.STJ
             return string.Empty;
         }
     }
-}

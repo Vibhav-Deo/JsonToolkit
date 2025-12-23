@@ -1,12 +1,10 @@
-using System;
+namespace JsonToolkit.STJ;
 
-namespace JsonToolkit.STJ
+/// <summary>
+/// Configuration options for case-insensitive property matching.
+/// </summary>
+public class CaseInsensitivePropertyOptions
 {
-    /// <summary>
-    /// Configuration options for case-insensitive property matching.
-    /// </summary>
-    public class CaseInsensitivePropertyOptions
-    {
         /// <summary>
         /// Gets or sets a value indicating whether to throw an exception when ambiguous property matches are found.
         /// When true, throws an exception if multiple properties could match a JSON property name.
@@ -41,4 +39,3 @@ namespace JsonToolkit.STJ
             set => ThrowOnAmbiguousMatch = value;
         }
     }
-}

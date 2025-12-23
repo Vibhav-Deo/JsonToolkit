@@ -1,10 +1,10 @@
-namespace JsonToolkit.STJ
+namespace JsonToolkit.STJ;
+
+/// <summary>
+/// Configuration options for JSON validation during deserialization.
+/// </summary>
+public class ValidationOptions
 {
-    /// <summary>
-    /// Configuration options for JSON validation during deserialization.
-    /// </summary>
-    public class ValidationOptions
-    {
         /// <summary>
         /// Gets or sets whether validation is enabled during deserialization.
         /// Default is true.
@@ -86,4 +86,3 @@ namespace JsonToolkit.STJ
             ValidateNestedObjects = false
         };
     }
-}
