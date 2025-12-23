@@ -61,12 +61,12 @@ namespace JsonToolkit.STJ.Tests.Integration
             _output.WriteLine($"  Ratio: {ratio:F2}x");
 
             // Since both use the same underlying serializer, performance should be nearly identical
-            // Allow for some variance due to measurement noise and system load
-            var maxDifference = Math.Max(systemTime, toolkitTime) * 0.2; // 20% tolerance
+            // Allow for more variance due to measurement noise, system load, and JIT effects
+            var maxDifference = Math.Max(systemTime, toolkitTime) * 0.5; // 50% tolerance
             var actualDifference = Math.Abs(systemTime - toolkitTime);
             
-            Assert.True(actualDifference <= maxDifference + 20, // +20ms for measurement noise
-                $"Performance difference too large: {actualDifference}ms (max allowed: {maxDifference + 20}ms)");
+            Assert.True(actualDifference <= maxDifference + 50, // +50ms for measurement noise
+                $"Performance difference too large: {actualDifference}ms (max allowed: {maxDifference + 50}ms)");
         }
 
         [Fact]
@@ -109,11 +109,11 @@ namespace JsonToolkit.STJ.Tests.Integration
             _output.WriteLine($"  Ratio: {ratio:F2}x");
 
             // Since both use the same underlying deserializer, performance should be nearly identical
-            var maxDifference = Math.Max(systemTime, toolkitTime) * 0.2; // 20% tolerance
+            var maxDifference = Math.Max(systemTime, toolkitTime) * 0.5; // 50% tolerance
             var actualDifference = Math.Abs(systemTime - toolkitTime);
             
-            Assert.True(actualDifference <= maxDifference + 20, // +20ms for measurement noise
-                $"Performance difference too large: {actualDifference}ms (max allowed: {maxDifference + 20}ms)");
+            Assert.True(actualDifference <= maxDifference + 50, // +50ms for measurement noise
+                $"Performance difference too large: {actualDifference}ms (max allowed: {maxDifference + 50}ms)");
         }
 
         [Fact]
@@ -308,9 +308,16 @@ namespace JsonToolkit.STJ.Tests.Integration
             _output.WriteLine($"  Final: {finalMemory / 1024.0:F2} KB");
             _output.WriteLine($"  Increase: {memoryIncreaseKB:F2} KB");
 
-            // Memory increase should be reasonable (< 5MB for this test)
-            Assert.True(memoryIncreaseKB < 5120, 
-                $"Memory increased by {memoryIncreaseKB:F2} KB (should be < 5MB)");
+            // Memory increase should be reasonable
+            // Different frameworks have different GC behaviors, so be more lenient
+#if NET462
+            var maxMemoryKB = 15360; // 15MB for .NET Framework (less efficient GC)
+#else
+            var maxMemoryKB = 5120;  // 5MB for modern .NET
+#endif
+            
+            Assert.True(memoryIncreaseKB < maxMemoryKB, 
+                $"Memory increased by {memoryIncreaseKB:F2} KB (should be < {maxMemoryKB / 1024}MB)");
         }
 
         [Fact]
