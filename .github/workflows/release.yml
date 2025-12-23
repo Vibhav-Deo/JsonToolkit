@@ -81,9 +81,22 @@ jobs:
         echo "OIDC Token URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-'Not available'}"
         echo "OIDC Token Available: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+'Yes'}"
         
-        dotnet nuget push "./artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key PLACEHOLDER --skip-duplicate
+        # Show NuGet configuration
+        echo "NuGet sources:"
+        dotnet nuget list source
+        
+        # Show package details
+        echo "Package files to publish:"
+        ls -la ./artifacts/
+        
+        echo "Attempting to publish main package..."
+        dotnet nuget push "./artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key PLACEHOLDER --skip-duplicate --verbosity detailed
         
         # Only push symbols if main package succeeded
         if [ $? -eq 0 ]; then
-          dotnet nuget push "./artifacts/*.snupkg" --source https://api.nuget.org/v3/index.json --api-key PLACEHOLDER --skip-duplicate
+          echo "Main package published successfully, now publishing symbols..."
+          dotnet nuget push "./artifacts/*.snupkg" --source https://api.nuget.org/v3/index.json --api-key PLACEHOLDER --skip-duplicate --verbosity detailed
+        else
+          echo "Main package publishing failed, skipping symbols"
+          exit 1
         fi
