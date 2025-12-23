@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.2.3 or 1.2.3-beta.1)'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -32,13 +38,23 @@ jobs:
       id: version
       shell: bash
       run: |
-        VERSION="${GITHUB_REF_NAME#v}"
+        # Determine version source
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+          echo "Using manual version: $VERSION"
+        else
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Using tag version: $VERSION"
+        fi
 
+        # Validate version format
         if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?$ ]]; then
-          echo "Invalid version: $VERSION"
+          echo "❌ Invalid version format: $VERSION"
+          echo "Expected format: {MAJOR}.{MINOR}.{PATCH} or {MAJOR}.{MINOR}.{PATCH}-{PRERELEASE}"
           exit 1
         fi
 
+        echo "✅ Valid version: $VERSION"
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Restore

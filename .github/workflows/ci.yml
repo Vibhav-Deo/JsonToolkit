@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -51,7 +52,14 @@ jobs:
 
     - name: Build
       run: |
+        # Set a CI-friendly version for builds
+        CI_VERSION="1.0.0-ci.${{ github.run_number }}"
+        echo "Building with CI version: $CI_VERSION"
+        
         dotnet build -c Release --no-restore \
+          -p:Version="$CI_VERSION" \
+          -p:AssemblyVersion="1.0.0.0" \
+          -p:FileVersion="1.0.0.${{ github.run_number }}" \
           -p:ContinuousIntegrationBuild=true \
           -p:Deterministic=true
 
