@@ -186,7 +186,7 @@ jobs:
         echo "## Release Test Results for ${{ matrix.display-name }}" >> $GITHUB_STEP_SUMMARY
         
         # Check for test failures
-        if find TestResults/Release/${{ matrix.framework }} -name "*.trx" -exec grep -l "outcome=\"Failed\"" {} \; | head -1 > /dev/null; then
+        if find TestResults/Release/${{ matrix.framework }} -name "*.trx" -exec grep -l "outcome=\"Failed\"" {} \; 2>/dev/null | head -1 > /dev/null 2>&1; then
           echo "❌ **Tests failed** - Release cannot proceed" >> $GITHUB_STEP_SUMMARY
           exit 1
         else
@@ -243,7 +243,7 @@ jobs:
         dotnet pack --no-build --configuration Release --output ./release-artifacts -p:PackageVersion=${{ needs.validate-version.outputs.version-number }} -p:Version=${{ needs.validate-version.outputs.version-number }} -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} -p:FileVersion=${{ needs.validate-version.outputs.version-number }}
         
         # Find the created package
-        PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" | head -1)
+        PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" 2>/dev/null | head -1)
         PACKAGE_NAME=$(basename "$PACKAGE_FILE")
         
         if [ -z "$PACKAGE_FILE" ]; then
@@ -379,7 +379,7 @@ jobs:
         echo "Validating publishing permissions..."
         
         # Check that we have the package to publish
-        PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" | head -1)
+        PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" 2>/dev/null | head -1)
         if [ -z "$PACKAGE_FILE" ]; then
           echo "❌ No package file found in artifacts"
           exit 1
@@ -406,7 +406,7 @@ jobs:
       run: |
         echo "Publishing package to NuGet.org using OIDC Trusted Publishing..."
         
-        PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" | head -1)
+        PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" 2>/dev/null | head -1)
         PACKAGE_NAME=$(basename "$PACKAGE_FILE")
         
         echo "Publishing: $PACKAGE_NAME"

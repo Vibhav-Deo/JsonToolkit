@@ -107,19 +107,24 @@ jobs:
         echo "## Test Coverage Summary for ${{ matrix.display-name }}" >> $GITHUB_STEP_SUMMARY
         
         # Find the coverage file
-        COVERAGE_FILE=$(find TestResults/${{ matrix.framework }} -name "coverage.cobertura.xml" | head -1)
+        COVERAGE_FILE=$(find TestResults/${{ matrix.framework }} -name "coverage.cobertura.xml" 2>/dev/null | head -1)
         
         if [ -f "$COVERAGE_FILE" ]; then
           # Extract coverage percentage using basic tools available in GitHub Actions
-          LINE_RATE=$(grep -o 'line-rate="[^"]*"' "$COVERAGE_FILE" | head -1 | cut -d'"' -f2)
-          BRANCH_RATE=$(grep -o 'branch-rate="[^"]*"' "$COVERAGE_FILE" | head -1 | cut -d'"' -f2)
+          LINE_RATE=$(grep -o 'line-rate="[^"]*"' "$COVERAGE_FILE" | head -1 | cut -d'"' -f2 2>/dev/null || echo "")
+          BRANCH_RATE=$(grep -o 'branch-rate="[^"]*"' "$COVERAGE_FILE" | head -1 | cut -d'"' -f2 2>/dev/null || echo "")
           
           if [ ! -z "$LINE_RATE" ] && [ ! -z "$BRANCH_RATE" ]; then
-            LINE_PERCENT=$(echo "$LINE_RATE * 100" | bc -l | cut -d'.' -f1)
-            BRANCH_PERCENT=$(echo "$BRANCH_RATE * 100" | bc -l | cut -d'.' -f1)
-            
-            echo "- **Line Coverage**: ${LINE_PERCENT}%" >> $GITHUB_STEP_SUMMARY
-            echo "- **Branch Coverage**: ${BRANCH_PERCENT}%" >> $GITHUB_STEP_SUMMARY
+            # Try to calculate percentages, fallback to showing raw rates if bc is not available
+            if command -v bc >/dev/null 2>&1; then
+              LINE_PERCENT=$(echo "$LINE_RATE * 100" | bc -l 2>/dev/null | cut -d'.' -f1 2>/dev/null || echo "0")
+              BRANCH_PERCENT=$(echo "$BRANCH_RATE * 100" | bc -l 2>/dev/null | cut -d'.' -f1 2>/dev/null || echo "0")
+              echo "- **Line Coverage**: ${LINE_PERCENT}%" >> $GITHUB_STEP_SUMMARY
+              echo "- **Branch Coverage**: ${BRANCH_PERCENT}%" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Line Coverage**: ${LINE_RATE} (raw rate)" >> $GITHUB_STEP_SUMMARY
+              echo "- **Branch Coverage**: ${BRANCH_RATE} (raw rate)" >> $GITHUB_STEP_SUMMARY
+            fi
           else
             echo "- Coverage data available in artifacts" >> $GITHUB_STEP_SUMMARY
           fi
@@ -143,7 +148,7 @@ jobs:
         echo "- **Total Test Files**: $ALL_TESTS" >> $GITHUB_STEP_SUMMARY
         
         # Check for test failures by examining TRX files
-        if find TestResults/${{ matrix.framework }} -name "*.trx" -exec grep -l "outcome=\"Failed\"" {} \; | head -1 > /dev/null; then
+        if find TestResults/${{ matrix.framework }} -name "*.trx" -exec grep -l "outcome=\"Failed\"" {} \; 2>/dev/null | head -1 > /dev/null 2>&1; then
           echo "- **Status**: ❌ Some tests failed" >> $GITHUB_STEP_SUMMARY
         else
           echo "- **Status**: ✅ All tests passed" >> $GITHUB_STEP_SUMMARY
@@ -158,6 +163,7 @@ jobs:
     steps:
     - name: Download all test artifacts
       uses: actions/download-artifact@v4
+      continue-on-error: true
       with:
         pattern: test-results-*
         path: ./all-test-results
@@ -165,6 +171,7 @@ jobs:
 
     - name: Download all coverage artifacts  
       uses: actions/download-artifact@v4
+      continue-on-error: true
       with:
         pattern: coverage-*
         path: ./all-coverage-results
@@ -180,12 +187,22 @@ jobs:
       run: |
         mkdir -p ./coverage-report
         
+        # Check if coverage results directory exists
+        if [ ! -d "./all-coverage-results" ]; then
+          echo "## 📊 Consolidated Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "No coverage results directory found. This may indicate that tests failed or coverage was not collected." >> $GITHUB_STEP_SUMMARY
+          exit 0
+        fi
+        
         # Find all coverage files
-        find ./all-coverage-results -name "coverage.cobertura.xml" -o -name "coverage.opencover.xml" > coverage-files.txt
+        find ./all-coverage-results -name "coverage.cobertura.xml" -o -name "coverage.opencover.xml" > coverage-files.txt 2>/dev/null || touch coverage-files.txt
         
         if [ -s coverage-files.txt ]; then
           # Generate HTML report
-          reportgenerator -reports:"$(cat coverage-files.txt | tr '\n' ';')" -targetdir:./coverage-report -reporttypes:"Html;Badges;TextSummary" -title:"JsonToolkit.STJ Coverage Report" -tag:"${{ github.run_number }}"
+          COVERAGE_REPORTS=$(cat coverage-files.txt | tr '\n' ';' 2>/dev/null || echo "")
+          if [ ! -z "$COVERAGE_REPORTS" ]; then
+            reportgenerator -reports:"$COVERAGE_REPORTS" -targetdir:./coverage-report -reporttypes:"Html;Badges;TextSummary" -title:"JsonToolkit.STJ Coverage Report" -tag:"${{ github.run_number }}" 2>/dev/null || echo "Report generation failed"
+          fi
             
           echo "## 📊 Consolidated Coverage Report" >> $GITHUB_STEP_SUMMARY
           
@@ -196,7 +213,8 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
         else
-          echo "No coverage files found" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Consolidated Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "No coverage files found in artifacts" >> $GITHUB_STEP_SUMMARY
         fi
 
     - name: Upload consolidated coverage report
@@ -213,18 +231,28 @@ jobs:
         echo "## 🧪 Test Execution Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
+        # Check if test results directory exists
+        if [ ! -d "./all-test-results" ]; then
+          echo "No test results directory found. This may indicate that tests failed or artifacts were not uploaded." >> $GITHUB_STEP_SUMMARY
+          exit 0
+        fi
+        
         # Count total test result files
-        TOTAL_TRX_FILES=$(find ./all-test-results -name "*.trx" | wc -l)
+        TOTAL_TRX_FILES=$(find ./all-test-results -name "*.trx" 2>/dev/null | wc -l)
         echo "**Total test result files**: $TOTAL_TRX_FILES" >> $GITHUB_STEP_SUMMARY
         
         # List all matrix combinations that ran
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Test Matrix Results**:" >> $GITHUB_STEP_SUMMARY
         
-        for trx_file in $(find ./all-test-results -name "*.trx"); do
-          filename=$(basename "$trx_file")
-          echo "- $filename" >> $GITHUB_STEP_SUMMARY
-        done
+        if [ "$TOTAL_TRX_FILES" -gt 0 ]; then
+          for trx_file in $(find ./all-test-results -name "*.trx" 2>/dev/null); do
+            filename=$(basename "$trx_file")
+            echo "- $filename" >> $GITHUB_STEP_SUMMARY
+          done
+        else
+          echo "- No test result files found" >> $GITHUB_STEP_SUMMARY
+        fi
 
   build-artifacts:
     name: Build Artifacts
