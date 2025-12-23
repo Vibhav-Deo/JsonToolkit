@@ -154,11 +154,7 @@ jobs:
     - name: Build solution in Release configuration
       run: |
         echo "Building with version: ${{ needs.validate-version.outputs.version-number }}"
-        dotnet build --no-restore --configuration Release \
-          -p:Version=${{ needs.validate-version.outputs.version-number }} \
-          -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} \
-          -p:FileVersion=${{ needs.validate-version.outputs.version-number }} \
-          -p:PackageVersion=${{ needs.validate-version.outputs.version-number }}
+        dotnet build --no-restore --configuration Release -p:Version=${{ needs.validate-version.outputs.version-number }} -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} -p:FileVersion=${{ needs.validate-version.outputs.version-number }} -p:PackageVersion=${{ needs.validate-version.outputs.version-number }}
 
     - name: Run comprehensive test suite
       run: |
@@ -168,14 +164,7 @@ jobs:
         mkdir -p TestResults/Release/${{ matrix.framework }}
         
         # Run all tests with detailed logging
-        dotnet test --no-build --configuration Release --framework ${{ matrix.framework }} \
-          --logger "trx;LogFileName=release-tests-${{ matrix.framework }}.trx" \
-          --logger "console;verbosity=detailed" \
-          --results-directory TestResults/Release/${{ matrix.framework }} \
-          --collect:"XPlat Code Coverage" \
-          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura \
-          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[JsonToolkit.STJ]*" \
-          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[JsonToolkit.STJ.Tests]*"
+        dotnet test --no-build --configuration Release --framework ${{ matrix.framework }} --logger "trx;LogFileName=release-tests-${{ matrix.framework }}.trx" --logger "console;verbosity=detailed" --results-directory TestResults/Release/${{ matrix.framework }} --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[JsonToolkit.STJ]*" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[JsonToolkit.STJ.Tests]*"
 
     - name: Upload release test results
       uses: actions/upload-artifact@v4
@@ -235,13 +224,7 @@ jobs:
     - name: Build release with version injection
       run: |
         echo "Building release package with version: ${{ needs.validate-version.outputs.version-number }}"
-        dotnet build --no-restore --configuration Release \
-          -p:Version=${{ needs.validate-version.outputs.version-number }} \
-          -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} \
-          -p:FileVersion=${{ needs.validate-version.outputs.version-number }} \
-          -p:PackageVersion=${{ needs.validate-version.outputs.version-number }} \
-          -p:RepositoryCommit=${{ github.sha }} \
-          -p:RepositoryBranch=${{ github.ref_name }}
+        dotnet build --no-restore --configuration Release -p:Version=${{ needs.validate-version.outputs.version-number }} -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} -p:FileVersion=${{ needs.validate-version.outputs.version-number }} -p:PackageVersion=${{ needs.validate-version.outputs.version-number }} -p:RepositoryCommit=${{ github.sha }} -p:RepositoryBranch=${{ github.ref_name }}
 
     - name: Create NuGet package
       id: create-package
@@ -250,12 +233,7 @@ jobs:
         mkdir -p ./release-artifacts
         
         # Create the package with version information
-        dotnet pack --no-build --configuration Release \
-          --output ./release-artifacts \
-          -p:PackageVersion=${{ needs.validate-version.outputs.version-number }} \
-          -p:Version=${{ needs.validate-version.outputs.version-number }} \
-          -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} \
-          -p:FileVersion=${{ needs.validate-version.outputs.version-number }}
+        dotnet pack --no-build --configuration Release --output ./release-artifacts -p:PackageVersion=${{ needs.validate-version.outputs.version-number }} -p:Version=${{ needs.validate-version.outputs.version-number }} -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} -p:FileVersion=${{ needs.validate-version.outputs.version-number }}
         
         # Find the created package
         PACKAGE_FILE=$(find ./release-artifacts -name "*.nupkg" | head -1)
@@ -427,12 +405,7 @@ jobs:
         # Publish using dotnet nuget push with OIDC
         # The --api-key parameter is required but will be ignored when using OIDC
         # We use a placeholder value as recommended by Microsoft
-        dotnet nuget push "$PACKAGE_FILE" \
-          --source https://api.nuget.org/v3/index.json \
-          --api-key "PLACEHOLDER_FOR_OIDC" \
-          --skip-duplicate \
-          --no-symbols \
-          --timeout 300
+        dotnet nuget push "$PACKAGE_FILE" --source https://api.nuget.org/v3/index.json --api-key "PLACEHOLDER_FOR_OIDC" --skip-duplicate --no-symbols --timeout 300
         
         if [ $? -eq 0 ]; then
           echo "✅ Package published successfully to NuGet.org"

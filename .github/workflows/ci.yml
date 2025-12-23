@@ -67,32 +67,15 @@ jobs:
         mkdir -p TestResults/${{ matrix.framework }}
         
         # Run all tests with detailed logging and coverage
-        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} \
-          --logger "trx;LogFileName=test-results-${{ matrix.framework }}.trx" \
-          --logger "console;verbosity=detailed" \
-          --results-directory TestResults/${{ matrix.framework }} \
-          --collect:"XPlat Code Coverage" \
-          --settings coverlet.runsettings \
-          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura \
-          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[JsonToolkit.STJ]*" \
-          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[JsonToolkit.STJ.Tests]*"
+        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} --logger "trx;LogFileName=test-results-${{ matrix.framework }}.trx" --logger "console;verbosity=detailed" --results-directory TestResults/${{ matrix.framework }} --collect:"XPlat Code Coverage" --settings coverlet.runsettings -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Include="[JsonToolkit.STJ]*" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[JsonToolkit.STJ.Tests]*"
 
     - name: Run unit tests separately for detailed reporting
       run: |
-        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} \
-          --logger "trx;LogFileName=unit-tests-${{ matrix.framework }}.trx" \
-          --results-directory TestResults/${{ matrix.framework }} \
-          --filter "Category!=Property" \
-          --collect:"XPlat Code Coverage"
+        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} --logger "trx;LogFileName=unit-tests-${{ matrix.framework }}.trx" --results-directory TestResults/${{ matrix.framework }} --filter "Category!=Property" --collect:"XPlat Code Coverage"
 
     - name: Run property-based tests separately with extended timeout
       run: |
-        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} \
-          --logger "trx;LogFileName=property-tests-${{ matrix.framework }}.trx" \
-          --results-directory TestResults/${{ matrix.framework }} \
-          --filter "Category=Property" \
-          --collect:"XPlat Code Coverage" \
-          -- RunConfiguration.TestSessionTimeout=600000
+        dotnet test --no-build --configuration Debug --framework ${{ matrix.framework }} --logger "trx;LogFileName=property-tests-${{ matrix.framework }}.trx" --results-directory TestResults/${{ matrix.framework }} --filter "Category=Property" --collect:"XPlat Code Coverage" -- RunConfiguration.TestSessionTimeout=600000
 
     - name: Upload test results
       uses: actions/upload-artifact@v4
@@ -195,12 +178,7 @@ jobs:
         
         if [ -s coverage-files.txt ]; then
           # Generate HTML report
-          reportgenerator \
-            -reports:"$(cat coverage-files.txt | tr '\n' ';')" \
-            -targetdir:./coverage-report \
-            -reporttypes:"Html;Badges;TextSummary" \
-            -title:"JsonToolkit.STJ Coverage Report" \
-            -tag:"${{ github.run_number }}"
+          reportgenerator -reports:"$(cat coverage-files.txt | tr '\n' ';')" -targetdir:./coverage-report -reporttypes:"Html;Badges;TextSummary" -title:"JsonToolkit.STJ Coverage Report" -tag:"${{ github.run_number }}"
             
           echo "## 📊 Consolidated Coverage Report" >> $GITHUB_STEP_SUMMARY
           
