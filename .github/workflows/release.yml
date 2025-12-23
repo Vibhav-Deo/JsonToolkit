@@ -7,12 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.2.3 or 1.2.3-beta.1)'
+        description: 'Version to release (e.g. 1.2.3 or 1.2.3-beta.1)'
         required: true
         type: string
 
 permissions:
-  id-token: write       # Required for OIDC
+  id-token: write
   contents: read
 
 env:
@@ -26,13 +26,11 @@ jobs:
     environment: nuget-production
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    - uses: actions/setup-dotnet@v4
       with:
         dotnet-version: |
           6.0.x
@@ -44,23 +42,26 @@ jobs:
       run: |
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           VERSION="${{ github.event.inputs.version }}"
+          echo "Using manual version: $VERSION"
         else
           VERSION="${GITHUB_REF_NAME#v}"
+          echo "Using tag version: $VERSION"
         fi
 
-        # Validate version format
         if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\.-]+)?$ ]]; then
           echo "❌ Invalid version format: $VERSION"
+          echo "Expected format: {MAJOR}.{MINOR}.{PATCH} or {MAJOR}.{MINOR}.{PATCH}-{PRERELEASE}"
           exit 1
         fi
 
         echo "✅ Valid version: $VERSION"
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-    - name: Restore dependencies
+    - name: Restore
       run: dotnet restore
 
     - name: Build
+      shell: bash
       run: |
         dotnet build -c Release --no-restore \
           -p:Version=$VERSION \
@@ -69,10 +70,12 @@ jobs:
           -p:RepositoryUrl=https://github.com/${{ github.repository }} \
           -p:RepositoryCommit=${{ github.sha }}
 
-    - name: Run Tests
-      run: dotnet test -c Release --no-build --logger "trx" --framework net8.0
+    - name: Test
+      shell: bash
+      run: dotnet test -c Release --no-build --framework net8.0
 
-    - name: Pack NuGet
+    - name: Pack
+      shell: bash
       run: |
         mkdir -p ./artifacts
         dotnet pack -c Release --no-build \
@@ -82,35 +85,31 @@ jobs:
           --output ./artifacts
 
     - name: Publish to NuGet (OIDC)
-      run: |
-        echo "Publishing to NuGet.org via OIDC..."
-        echo "Package files:"
-        ls -la ./artifacts
-
-        # Push main package
-        dotnet nuget push "./artifacts/*.nupkg" \
-          --source https://api.nuget.org/v3/index.json \
-          --skip-duplicate
-
-        # Push symbols package
-        dotnet nuget push "./artifacts/*.snupkg" \
-          --source https://api.nuget.org/v3/index.json \
-          --skip-duplicate
-
-    - name: Verify published package
       shell: bash
       run: |
-        echo "Checking NuGet availability..."
-        MAX_ATTEMPTS=10
-        ATTEMPT=1
-        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-          RESPONSE=$(curl -s "https://api.nuget.org/v3-flatcontainer/${{ env.PACKAGE_ID | downcase }}/index.json")
-          if echo "$RESPONSE" | grep -q "\"$VERSION\""; then
-            echo "✅ Package $VERSION is available on NuGet.org"
-            break
-          else
-            echo "Waiting 15s..."
-            sleep 15
-            ATTEMPT=$((ATTEMPT+1))
-          fi
+        echo "Publishing ${{ env.PACKAGE_ID.toLowerCase() }} to NuGet.org via OIDC..."
+        echo "Repository: ${{ github.repository }}"
+        echo "Environment: ${{ github.environment }}"
+        echo "OIDC Token URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-'Not available'}"
+        echo "OIDC Token Available: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+Yes}"
+
+        echo "Package files:"
+        ls -la ./artifacts/
+
+        # Publish main packages
+        for pkg in ./artifacts/*.nupkg; do
+          echo "Pushing $pkg..."
+          dotnet nuget push "$pkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key PLACEHOLDER \
+            --skip-duplicate
+        done
+
+        # Publish symbols packages
+        for sym in ./artifacts/*.snupkg; do
+          echo "Pushing $sym..."
+          dotnet nuget push "$sym" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key PLACEHOLDER \
+            --skip-duplicate
         done
