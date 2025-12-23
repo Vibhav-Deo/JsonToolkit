@@ -315,6 +315,29 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Configures circular reference handling for serialization.
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to enhance.</param>
+        /// <param name="configure">Optional action to configure circular reference options.</param>
+        /// <returns>The enhanced JsonSerializerOptions instance.</returns>
+        public static JsonSerializerOptions WithCircularReferenceHandling(this JsonSerializerOptions options, Action<CircularReferenceOptions>? configure = null)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            var circularOptions = new CircularReferenceOptions();
+            configure?.Invoke(circularOptions);
+
+            var handler = circularOptions.GetReferenceHandler();
+            if (handler != null)
+            {
+                options.ReferenceHandler = handler;
+            }
+
+            return options;
+        }
+
+        /// <summary>
         /// Enables support for modern C# features like records and init-only properties.
         /// </summary>
         /// <param name="options">The JsonSerializerOptions to enhance.</param>

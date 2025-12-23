@@ -260,6 +260,17 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Configures circular reference handling.
+        /// </summary>
+        /// <param name="configure">Action to configure circular reference options.</param>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithCircularReferenceHandling(Action<CircularReferenceOptions> configure)
+        {
+            _configurations.Add(options => options.WithCircularReferenceHandling(configure));
+            return this;
+        }
+
+        /// <summary>
         /// Applies a custom configuration action to the options.
         /// </summary>
         /// <param name="configure">The configuration action to apply.</param>
