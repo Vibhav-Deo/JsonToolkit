@@ -53,10 +53,17 @@ namespace JsonToolkit.STJ.Converters
             }
             catch (Exception ex) when (!(ex is JsonToolkitException))
             {
+                var context = ErrorContext.ForConverter(ConverterName, operation: "Write")
+                    .WithContext("TargetType", typeof(T).Name)
+                    .WithContext("ValueType", value?.GetType().Name ?? "null")
+                    .WithContext("ConverterType", "WriteOnly");
+
+                var message = context.GetFormattedMessage($"Error writing value of type '{typeof(T).Name}' using write-only converter '{ConverterName}'");
+                
                 throw new JsonToolkitException(
-                    $"Error writing value of type '{typeof(T).Name}' using write-only converter '{ConverterName}'.",
+                    message,
                     ex,
-                    operation: "Write"
+                    operation: context.Operation
                 );
             }
         }

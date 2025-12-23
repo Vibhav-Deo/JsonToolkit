@@ -37,11 +37,18 @@ namespace JsonToolkit.STJ.Converters
             }
             catch (Exception ex) when (!(ex is JsonToolkitException))
             {
+                var context = ErrorContext.FromReader(ref reader, "Read")
+                    .WithContext("ConverterName", ConverterName)
+                    .WithContext("TargetType", typeToConvert.Name)
+                    .WithContext("ConverterType", "ReadOnly");
+
+                var message = context.GetFormattedMessage($"Error reading value of type '{typeToConvert.Name}' using read-only converter '{ConverterName}'");
+                
                 throw new JsonToolkitException(
-                    $"Error reading value of type '{typeToConvert.Name}' using read-only converter '{ConverterName}'.",
+                    message,
                     ex,
-                    propertyPath: GetReaderPath(ref reader),
-                    operation: "Read"
+                    propertyPath: context.PropertyPath,
+                    operation: context.Operation
                 );
             }
         }
@@ -102,17 +109,5 @@ namespace JsonToolkit.STJ.Converters
             return true;
         }
 
-        /// <summary>
-        /// Gets the current path from the reader, handling version compatibility.
-        /// </summary>
-        /// <param name="reader">The reader to get the path from.</param>
-        /// <returns>The current path or null if not available.</returns>
-        private static string? GetReaderPath(ref Utf8JsonReader reader)
-        {
-            // Path property is not consistently available across all target frameworks
-            // For now, return null - this is acceptable as the path is used for enhanced error messages
-            // In a future version, we could implement path tracking manually if needed
-            return null;
-        }
     }
 }
