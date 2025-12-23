@@ -38,6 +38,7 @@ jobs:
 
     - name: Extract version from tag or input
       id: extract-version
+      shell: bash
       run: |
         # Determine version source
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -86,6 +87,7 @@ jobs:
         echo "- **Pre-release**: $IS_PRERELEASE" >> $GITHUB_STEP_SUMMARY
 
     - name: Check if version already exists on NuGet
+      shell: bash
       run: |
         VERSION_NUMBER="${{ steps.extract-version.outputs.version-number }}"
         
@@ -152,11 +154,13 @@ jobs:
       run: dotnet restore
 
     - name: Build solution in Release configuration
+      shell: bash
       run: |
         echo "Building with version: ${{ needs.validate-version.outputs.version-number }}"
         dotnet build --no-restore --configuration Release -p:Version=${{ needs.validate-version.outputs.version-number }} -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} -p:FileVersion=${{ needs.validate-version.outputs.version-number }} -p:PackageVersion=${{ needs.validate-version.outputs.version-number }}
 
     - name: Run comprehensive test suite
+      shell: bash
       run: |
         echo "Running complete test suite for release validation..."
         
@@ -177,6 +181,7 @@ jobs:
         retention-days: 90
 
     - name: Validate test results
+      shell: bash
       run: |
         echo "## Release Test Results for ${{ matrix.display-name }}" >> $GITHUB_STEP_SUMMARY
         
@@ -222,12 +227,14 @@ jobs:
       run: dotnet restore
 
     - name: Build release with version injection
+      shell: bash
       run: |
         echo "Building release package with version: ${{ needs.validate-version.outputs.version-number }}"
         dotnet build --no-restore --configuration Release -p:Version=${{ needs.validate-version.outputs.version-number }} -p:AssemblyVersion=${{ needs.validate-version.outputs.version-number }} -p:FileVersion=${{ needs.validate-version.outputs.version-number }} -p:PackageVersion=${{ needs.validate-version.outputs.version-number }} -p:RepositoryCommit=${{ github.sha }} -p:RepositoryBranch=${{ github.ref_name }}
 
     - name: Create NuGet package
       id: create-package
+      shell: bash
       run: |
         echo "Creating NuGet package..."
         mkdir -p ./release-artifacts
@@ -264,6 +271,7 @@ jobs:
         echo "- **SHA256**: $CHECKSUM" >> $GITHUB_STEP_SUMMARY
 
     - name: Validate package contents
+      shell: bash
       run: |
         PACKAGE_FILE="${{ steps.create-package.outputs.package-path }}"
         
@@ -337,6 +345,7 @@ jobs:
         path: ./release-artifacts
 
     - name: Validate OIDC environment
+      shell: bash
       run: |
         echo "Validating OIDC environment for NuGet Trusted Publishing..."
         
@@ -365,6 +374,7 @@ jobs:
         echo "- Run ID: ${{ github.run_id }}"
 
     - name: Validate publishing permissions
+      shell: bash
       run: |
         echo "Validating publishing permissions..."
         
@@ -392,6 +402,7 @@ jobs:
         echo "✅ Package version validation passed"
 
     - name: Publish to NuGet.org using OIDC
+      shell: bash
       run: |
         echo "Publishing package to NuGet.org using OIDC Trusted Publishing..."
         
@@ -416,6 +427,7 @@ jobs:
         fi
 
     - name: Verify package availability
+      shell: bash
       run: |
         echo "Verifying package availability on NuGet.org..."
         
@@ -447,6 +459,7 @@ jobs:
 
     - name: Generate publishing summary
       if: always()
+      shell: bash
       run: |
         echo "## 📦 NuGet Publishing Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -480,6 +493,7 @@ jobs:
     
     steps:
     - name: Generate release summary
+      shell: bash
       run: |
         echo "## 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -526,6 +540,7 @@ jobs:
         fi
 
     - name: Check overall release status
+      shell: bash
       run: |
         if [[ "${{ needs.validate-version.result }}" != "success" || 
               "${{ needs.build-and-test.result }}" != "success" || 
