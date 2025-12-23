@@ -12,7 +12,6 @@ on:
         type: string
 
 permissions:
-  id-token: write   # Required for OIDC
   contents: read
 
 env:
@@ -66,12 +65,7 @@ jobs:
     - name: Build
       shell: bash
       run: |
-        dotnet build -c Release --no-restore \
-          -p:Version=$VERSION \
-          -p:ContinuousIntegrationBuild=true \
-          -p:Deterministic=true \
-          -p:RepositoryUrl=https://github.com/${{ github.repository }} \
-          -p:RepositoryCommit=${{ github.sha }}
+        dotnet build -c Release --no-restore -p:Version=$VERSION -p:ContinuousIntegrationBuild=true -p:Deterministic=true -p:RepositoryUrl=https://github.com/${{ github.repository }} -p:RepositoryCommit=${{ github.sha }}
 
     - name: Test
       shell: bash
@@ -81,39 +75,21 @@ jobs:
       shell: bash
       run: |
         mkdir -p ./artifacts
-        dotnet pack -c Release --no-build \
-          -p:Version=$VERSION \
-          -p:IncludeSymbols=true \
-          -p:SymbolPackageFormat=snupkg \
-          --output ./artifacts
+        dotnet pack -c Release --no-build -p:Version=$VERSION -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg --output ./artifacts
 
-    - name: Publish to NuGet (OIDC)
+    - name: Publish to NuGet
       shell: bash
       run: |
-        echo "Publishing ${{ env.PACKAGE_ID }} to NuGet.org via OIDC..."
-        echo "Repository: ${{ github.repository }}"
-        echo "OIDC Token URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-'Not available'}"
-        echo "OIDC Token Available: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+Yes}"
-
-        ls -la ./artifacts/
-
-        # Publish main packages
         for pkg in ./artifacts/*.nupkg; do
           echo "Pushing $pkg..."
-          dotnet nuget push "$pkg" \
-            --source https://api.nuget.org/v3/index.json \
-            --interactive \
-            --skip-duplicate
+          dotnet nuget push "$pkg" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
         done
 
-        # Publish symbols packages
         for sym in ./artifacts/*.snupkg; do
           echo "Pushing $sym..."
-          dotnet nuget push "$sym" \
-            --source https://api.nuget.org/v3/index.json \
-            --interactive \
-            --skip-duplicate
+          dotnet nuget push "$sym" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
         done
+
 
     - name: Release Summary
       shell: bash
@@ -122,4 +98,4 @@ jobs:
         echo "- Package: ${{ env.PACKAGE_ID }}" >> $GITHUB_STEP_SUMMARY
         echo "- Version: $VERSION" >> $GITHUB_STEP_SUMMARY
         echo "- NuGet URL: https://www.nuget.org/packages/${{ env.PACKAGE_ID }}/$VERSION" >> $GITHUB_STEP_SUMMARY
-        echo "- Authentication: OIDC Trusted Publishing" >> $GITHUB_STEP_SUMMARY
+        echo "- Authentication: API Key" >> $GITHUB_STEP_SUMMARY
