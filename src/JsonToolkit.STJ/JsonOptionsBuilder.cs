@@ -170,8 +170,24 @@ namespace JsonToolkit.STJ
             
             _configurations.Add(options =>
             {
-                // This will be implemented when we create the PolymorphicConverter
-                // For now, we'll store the configuration for later use
+                if (builder.BaseType == null)
+                {
+                    throw new JsonToolkitException(
+                        "Base type must be specified for polymorphic type configuration",
+                        operation: "ConfigurePolymorphicTypes"
+                    );
+                }
+
+                // Create the polymorphic converter using reflection
+                var converterType = typeof(PolymorphicConverter<>).MakeGenericType(builder.BaseType);
+                var converter = (JsonConverter)Activator.CreateInstance(
+                    converterType,
+                    builder.TypeProperty,
+                    builder.TypeMappings,
+                    builder.FallbackType
+                )!;
+                
+                options.Converters.Add(converter);
             });
             
             return this;
