@@ -84,9 +84,26 @@ namespace JsonToolkit.STJ
             _flexibleEnums = true;
             _configurations.Add(options => 
             {
-                // This will be implemented when we create the FlexibleEnumConverter
-                // For now, we'll use the built-in JsonStringEnumConverter
-                options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: true));
+                // Add a factory converter that creates FlexibleEnumConverter instances for enum types
+                options.Converters.Add(new FlexibleEnumConverterFactory());
+            });
+            return this;
+        }
+
+        /// <summary>
+        /// Enables flexible enum serialization with custom options.
+        /// </summary>
+        /// <param name="configure">Action to configure flexible enum options.</param>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithFlexibleEnums(Action<FlexibleEnumOptions> configure)
+        {
+            _flexibleEnums = true;
+            var options = new FlexibleEnumOptions();
+            configure(options);
+            
+            _configurations.Add(serializerOptions => 
+            {
+                serializerOptions.Converters.Add(new FlexibleEnumConverterFactory(options));
             });
             return this;
         }
