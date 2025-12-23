@@ -283,6 +283,28 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
+        /// Enables automatic validation during deserialization using validation attributes.
+        /// </summary>
+        /// <param name="validationOptions">Optional validation options. If null, default options are used.</param>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithValidation(ValidationOptions? validationOptions = null)
+        {
+            _configurations.Add(options => options.WithValidation(validationOptions));
+            return this;
+        }
+
+        /// <summary>
+        /// Enables automatic validation during deserialization with custom configuration.
+        /// </summary>
+        /// <param name="configure">Action to configure validation options.</param>
+        /// <returns>The current JsonOptionsBuilder instance for method chaining.</returns>
+        public JsonOptionsBuilder WithValidation(Action<ValidationOptions> configure)
+        {
+            _configurations.Add(options => options.WithValidation(configure));
+            return this;
+        }
+
+        /// <summary>
         /// Applies a custom configuration action to the options.
         /// </summary>
         /// <param name="configure">The configuration action to apply.</param>
