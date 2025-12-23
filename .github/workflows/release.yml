@@ -87,7 +87,7 @@ jobs:
     - name: Publish to NuGet (OIDC)
       shell: bash
       run: |
-        echo "Publishing ${{ env.PACKAGE_ID.toLowerCase() }} to NuGet.org via OIDC..."
+        echo "Publishing to NuGet.org using OIDC authentication..."
         echo "Repository: ${{ github.repository }}"
         echo "Environment: ${{ github.environment }}"
         echo "OIDC Token URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-'Not available'}"
