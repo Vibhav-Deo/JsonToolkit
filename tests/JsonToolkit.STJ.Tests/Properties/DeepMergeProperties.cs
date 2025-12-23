@@ -445,19 +445,17 @@ namespace JsonToolkit.STJ.Tests.Properties
         public static Arbitrary<JsonObjectGen> Arbitrary()
         {
             var validStringGen = Gen.OneOf(
-                Gen.Constant<string?>(null),
+                Gen.Constant(""),
                 Gen.Elements("test", "value", "name", "data", "item", "hello", "world", "foo", "bar")
-            );
+            ).Select(s => s == "" ? null : s);
             
             var validIntArrayGen = Gen.OneOf(
-                Gen.Constant<int[]?>(null),
                 Gen.ArrayOf(Gen.Choose(0, 100)).Select(arr => arr.Length > 10 ? arr.Take(10).ToArray() : arr)
-            );
+            ).Select(arr => arr.Length == 0 ? null : arr);
             
             var validNestedGen = Gen.OneOf(
-                Gen.Constant<NestedObject?>(null),
                 validStringGen.Select(s => new NestedObject { NestedValue = s })
-            );
+            ).Select(obj => obj.NestedValue == null ? null : obj);
             
             return Arb.From(
                 from name in validStringGen

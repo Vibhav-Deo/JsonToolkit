@@ -68,8 +68,6 @@ namespace JsonToolkit.STJ.Tests.Integration
             
             var merged = JsonMerge.DeepMerge(element1, element2);
             
-            Assert.NotNull(merged);
-            
             // Verify merge worked by checking properties
             Assert.True(merged.TryGetProperty("A", out var aProp));
             Assert.Equal(1, aProp.GetInt32());
@@ -99,9 +97,8 @@ namespace JsonToolkit.STJ.Tests.Integration
             var json = """{"user": {"name": "John", "details": {"age": 30}}}""";
             var element = JElement.Parse(json);
             
-            Assert.NotNull(element);
-            Assert.Equal("John", element["user"]["name"].Value<string>());
-            Assert.Equal(30, element["user"]["details"]["age"].Value<int>());
+            Assert.Equal("John", element["user"]?["name"]?.Value<string>());
+            Assert.Equal(30, element["user"]?["details"]?["age"]?.Value<int>());
         }
 
         [Fact]
@@ -120,8 +117,8 @@ namespace JsonToolkit.STJ.Tests.Integration
             var results = JsonPath.Query(document.RootElement, "$.users[*].name").ToList();
             
             Assert.Equal(2, results.Count);
-            Assert.Contains("John", results.Select(r => r.GetString()));
-            Assert.Contains("Jane", results.Select(r => r.GetString()));
+            Assert.Contains("John", results.Select(r => r.GetString()).Where(s => s != null));
+            Assert.Contains("Jane", results.Select(r => r.GetString()).Where(s => s != null));
         }
 
         [Fact]

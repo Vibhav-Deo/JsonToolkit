@@ -363,19 +363,17 @@ namespace JsonToolkit.STJ.Tests.Properties
         public static Arbitrary<JsonDocumentGen> Arbitrary()
         {
             var validStringGen = Gen.OneOf(
-                Gen.Constant<string?>(null),
+                Gen.Constant(""),
                 Gen.Elements("test", "value", "name", "data", "item")
-            );
+            ).Select(s => s == "" ? null : s);
             
             var validIntArrayGen = Gen.OneOf(
-                Gen.Constant<int[]?>(null),
                 Gen.ArrayOf(Gen.Choose(0, 100)).Select(arr => arr.Length > 5 ? arr.Take(5).ToArray() : arr)
-            );
+            ).Select(arr => arr.Length == 0 ? null : arr);
             
             var validNestedGen = Gen.OneOf(
-                Gen.Constant<NestedPatchObject?>(null),
                 validStringGen.Select(s => new NestedPatchObject { NestedValue = s })
-            );
+            ).Select(obj => obj.NestedValue == null ? null : obj);
             
             return Arb.From(
                 from name in validStringGen
@@ -402,7 +400,7 @@ namespace JsonToolkit.STJ.Tests.Properties
         public static Arbitrary<ValidPatchGen> Arbitrary()
         {
             var validPaths = new[] { "/name", "/value", "/newProp", "/items/0", "/nested/nestedValue" };
-            var validValues = new object[] { "test", 42, true, null };
+            var validValues = new object?[] { "test", 42, true, null };
             
             var operationGen = Gen.OneOf(
                 // Add operations

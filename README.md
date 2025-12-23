@@ -184,14 +184,14 @@ JsonToolkit.STJ maintains System.Text.Json's performance characteristics while a
 
 | Operation | .NET 9.0 | .NET 8.0 | .NET Framework 4.6.2 | Description |
 |-----------|----------|----------|----------------------|-------------|
-| **Basic Serialization** | TBD | 53ms (1000 iterations) | 389ms (1000 iterations) | Raw serialization performance vs System.Text.Json |
-| **Basic Deserialization** | TBD | 143ms (1000 iterations) | 779ms (1000 iterations) | Raw deserialization performance vs System.Text.Json |
-| **Deep Merge** | TBD | 0.03ms per operation | 0.09ms per operation | Recursive JSON object merging |
-| **JSON Patch** | TBD | 0.02ms per operation | 0.14ms per operation | RFC 6902 patch operations |
-| **JsonPath Query** | TBD | 0.70ms per operation | 2.70ms per operation | Query 1000 items with filter |
-| **JElement Access** | TBD | 0.002ms per operation | 0.007ms per operation | Dynamic property access |
-| **Large Document (1.2MB)** | TBD | Serialize: 3ms, Deserialize: 12ms | Serialize: 22ms, Deserialize: 45ms | Processing large JSON documents |
-| **Memory Usage** | TBD | ~3MB increase (100 operations) | ~3.3MB increase (100 operations) | Memory overhead for mixed operations |
+| **Basic Serialization** | 100ms (1000 iterations) | 53ms (1000 iterations) | 385ms (1000 iterations) | Raw serialization performance vs System.Text.Json |
+| **Basic Deserialization** | 200ms (1000 iterations) | 111ms (1000 iterations) | 768ms (1000 iterations) | Raw deserialization performance vs System.Text.Json |
+| **Deep Merge** | 0.03ms per operation | 0.03ms per operation | 0.08ms per operation | Recursive JSON object merging |
+| **JSON Patch** | 0.02ms per operation | 0.02ms per operation | 0.09ms per operation | RFC 6902 patch operations |
+| **JsonPath Query** | 0.64ms per operation | 0.66ms per operation | 2.70ms per operation | Query 1000 items with filter |
+| **JElement Access** | 0.001ms per operation | 0.002ms per operation | 0.006ms per operation | Dynamic property access |
+| **Large Document (1.2MB)** | Serialize: 6ms, Deserialize: 13ms | Serialize: 2ms, Deserialize: 12ms | Serialize: 23ms, Deserialize: 41ms | Processing large JSON documents |
+| **Memory Usage** | ~4.3MB increase (100 operations) | ~2.5MB increase (100 operations) | ~3.3MB increase (100 operations) | Memory overhead for mixed operations |
 
 ### Performance Characteristics
 

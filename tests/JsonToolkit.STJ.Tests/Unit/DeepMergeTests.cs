@@ -71,8 +71,8 @@ namespace JsonToolkit.STJ.Tests.Unit
             var merged = JsonMerge.DeepMerge(target, source);
             
             // Assert
-            Assert.Equal("target", merged.Name);
-            Assert.Equal(1, merged.Value);
+            Assert.Equal("target", merged?.Name);
+            Assert.Equal(1, merged?.Value);
         }
 
         [Fact]

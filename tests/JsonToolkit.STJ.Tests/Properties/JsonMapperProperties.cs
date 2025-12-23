@@ -130,7 +130,8 @@ namespace JsonToolkit.STJ.Tests.Properties
             return true.ToProperty().And(() =>
             {
                 var mapper = JsonMapper.Create();
-                var result = mapper.Transform<SourceObject, TargetObject>((SourceObject)null);
+                SourceObject? nullSource = null;
+                var result = mapper.Transform<SourceObject?, TargetObject?>(nullSource);
                 
                 return result == null;
             });
@@ -190,51 +191,51 @@ namespace JsonToolkit.STJ.Tests.Properties
         // Test classes
         public class SourceObject
         {
-            public string FullName { get; set; }
+            public string FullName { get; set; } = "";
             public int Years { get; set; }
             public bool Active { get; set; }
         }
 
         public class TargetObject
         {
-            public string Name { get; set; }
+            public string Name { get; set; } = "";
             public int Age { get; set; }
-            public string Status { get; set; }
+            public string Status { get; set; } = "";
         }
 
         public class PersonTarget
         {
-            public string FirstName { get; set; }
-            public string LastName { get; set; }
+            public string FirstName { get; set; } = "";
+            public string LastName { get; set; } = "";
         }
 
         public class PersonInfo
         {
-            public string Name { get; set; }
+            public string Name { get; set; } = "";
         }
 
         public class AddressInfo
         {
-            public string Street { get; set; }
-            public string City { get; set; }
+            public string Street { get; set; } = "";
+            public string City { get; set; } = "";
         }
 
         public class NestedSource
         {
-            public PersonInfo PersonInfo { get; set; }
-            public AddressInfo AddressInfo { get; set; }
+            public PersonInfo PersonInfo { get; set; } = new();
+            public AddressInfo AddressInfo { get; set; } = new();
         }
 
         public class NestedTarget
         {
-            public PersonInfo PersonInfo { get; set; }
-            public AddressInfo AddressInfo { get; set; }
+            public PersonInfo PersonInfo { get; set; } = new();
+            public AddressInfo AddressInfo { get; set; } = new();
         }
 
         public class TransformTarget
         {
             public int DoubledValue { get; set; }
-            public string StringValue { get; set; }
+            public string StringValue { get; set; } = "";
         }
 
         public class SimpleSource
@@ -249,13 +250,13 @@ namespace JsonToolkit.STJ.Tests.Properties
 
         public class SimpleMatchingSource
         {
-            public string Name { get; set; }
+            public string Name { get; set; } = "";
             public int Age { get; set; }
         }
 
         public class SimpleMatchingTarget
         {
-            public string Name { get; set; }
+            public string Name { get; set; } = "";
             public int Age { get; set; }
         }
     }

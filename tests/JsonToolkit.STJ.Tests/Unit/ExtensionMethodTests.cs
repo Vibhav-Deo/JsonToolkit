@@ -123,8 +123,8 @@ namespace JsonToolkit.STJ.Tests.Unit
             Assert.Equal(original.DateTimeValue, roundTrip.DateTimeValue);
             Assert.Equal(original.ListValue, roundTrip.ListValue);
             Assert.Equal(original.DictionaryValue, roundTrip.DictionaryValue);
-            Assert.Equal(original.NestedObject.Name, roundTrip.NestedObject.Name);
-            Assert.Equal(original.NestedObject.Value, roundTrip.NestedObject.Value);
+            Assert.Equal(original.NestedObject?.Name, roundTrip.NestedObject?.Name);
+            Assert.Equal(original.NestedObject?.Value, roundTrip.NestedObject?.Value);
         }
     }
 

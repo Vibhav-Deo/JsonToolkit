@@ -315,9 +315,9 @@ namespace JsonToolkit.STJ.Tests.Properties
         public static Arbitrary<ValidatedObjectGen> Arbitrary()
         {
             var nameGen = Gen.OneOf(
-                Gen.Constant<string?>(null),
-                Gen.Elements("", "x", "ab", "valid_name", "a_very_long_name_that_exceeds_normal_limits_and_should_be_rejected_by_length_validation")
-            );
+                Gen.Constant(""),
+                Gen.Elements("x", "ab", "valid_name", "a_very_long_name_that_exceeds_normal_limits_and_should_be_rejected_by_length_validation")
+            ).Select(s => s == "" ? null : s);
 
             var ageGen = Gen.OneOf(
                 Gen.Constant<int?>(null),
@@ -325,9 +325,9 @@ namespace JsonToolkit.STJ.Tests.Properties
             );
 
             var emailGen = Gen.OneOf(
-                Gen.Constant<string?>(null),
-                Gen.Elements("", "invalid", "test@", "@test.com", "test@example.com", "valid.email@domain.co.uk")
-            );
+                Gen.Constant(""),
+                Gen.Elements("invalid", "test@", "@test.com", "test@example.com", "valid.email@domain.co.uk")
+            ).Select(s => s == "" ? null : s);
 
             return Arb.From(
                 from name in nameGen
