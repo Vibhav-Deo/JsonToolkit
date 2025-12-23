@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -51,5 +52,17 @@ public static class StringExtensions
         }
 
         return JsonSerializer.Deserialize(json, type, options);
+    }
+
+    /// <summary>
+    /// Compares two JSON strings for semantic equality, ignoring formatting and property order.
+    /// </summary>
+    /// <param name="json1">The first JSON string to compare.</param>
+    /// <param name="json2">The second JSON string to compare.</param>
+    /// <param name="orderSensitive">If true, array element order matters; if false, arrays are compared as sets.</param>
+    /// <returns>True if the JSON documents are semantically equal; otherwise, false.</returns>
+    public static bool SemanticEquals(this string json1, string json2, bool orderSensitive = false)
+    {
+        return JsonEquality.SemanticEquals(json1, json2, orderSensitive);
     }
 }
