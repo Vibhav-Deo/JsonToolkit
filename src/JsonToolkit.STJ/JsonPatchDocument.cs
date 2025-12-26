@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -12,6 +13,13 @@ namespace JsonToolkit.STJ
     public class JsonPatchDocument
     {
         private readonly List<JsonPatchOperation> _operations = new();
+        
+        // Cache for parsed JSON Pointer paths to improve performance
+        private static readonly ConcurrentDictionary<string, string[]> _pathCache = new();
+        
+        // Object pool for dictionaries to reduce allocations
+        private static readonly ConcurrentQueue<Dictionary<string, JsonElement>> _dictionaryPool = new();
+        private const int MaxPoolSize = 50;
 
         /// <summary>
         /// Gets the list of operations in this patch document.
@@ -354,10 +362,30 @@ namespace JsonToolkit.STJ
             if (!pointer.StartsWith("/"))
                 throw new JsonPatchException($"Invalid JSON Pointer: {pointer}. Must start with '/'");
 
-            return pointer.Substring(1)
+            // Use cached parsed paths for better performance
+            return _pathCache.GetOrAdd(pointer, p => p.Substring(1)
                 .Split('/')
                 .Select(UnescapeJsonPointer)
-                .ToArray();
+                .ToArray());
+        }
+
+        private static Dictionary<string, JsonElement> GetPooledDictionary()
+        {
+            if (_dictionaryPool.TryDequeue(out var dict))
+            {
+                dict.Clear();
+                return dict;
+            }
+            return new Dictionary<string, JsonElement>();
+        }
+
+        private static void ReturnPooledDictionary(Dictionary<string, JsonElement> dict)
+        {
+            if (_dictionaryPool.Count < MaxPoolSize)
+            {
+                dict.Clear();
+                _dictionaryPool.Enqueue(dict);
+            }
         }
 
         private static string UnescapeJsonPointer(string escaped)
@@ -406,29 +434,35 @@ namespace JsonToolkit.STJ
 
             if (element.ValueKind == JsonValueKind.Object)
             {
-                var properties = new Dictionary<string, JsonElement>();
-                
-                // Copy existing properties
-                foreach (var prop in element.EnumerateObject())
+                var properties = GetPooledDictionary();
+                try
                 {
-                    properties[prop.Name] = prop.Value;
-                }
+                    // Copy existing properties
+                    foreach (var prop in element.EnumerateObject())
+                    {
+                        properties[prop.Name] = prop.Value;
+                    }
 
-                // Set the target property
-                if (remainingPath.Length == 0)
-                {
-                    properties[segment] = value;
-                }
-                else
-                {
-                    var childElement = properties.TryGetValue(segment, out var existing) 
-                        ? existing 
-                        : (createPath ? CreateEmptyContainer(remainingPath[0]) : throw new JsonPatchException($"Property '{segment}' not found"));
-                    
-                    properties[segment] = SetValueAtPath(childElement, remainingPath, value, createPath);
-                }
+                    // Set the target property
+                    if (remainingPath.Length == 0)
+                    {
+                        properties[segment] = value;
+                    }
+                    else
+                    {
+                        var childElement = properties.TryGetValue(segment, out var existing) 
+                            ? existing 
+                            : (createPath ? CreateEmptyContainer(remainingPath[0]) : throw new JsonPatchException($"Property '{segment}' not found"));
+                        
+                        properties[segment] = SetValueAtPath(childElement, remainingPath, value, createPath);
+                    }
 
-                return CreateJsonObject(properties);
+                    return CreateJsonObject(properties);
+                }
+                finally
+                {
+                    ReturnPooledDictionary(properties);
+                }
             }
             else if (element.ValueKind == JsonValueKind.Array)
             {
@@ -500,30 +534,36 @@ namespace JsonToolkit.STJ
 
             if (element.ValueKind == JsonValueKind.Object)
             {
-                var properties = new Dictionary<string, JsonElement>();
-                
-                // Copy existing properties
-                foreach (var prop in element.EnumerateObject())
+                var properties = GetPooledDictionary();
+                try
                 {
-                    properties[prop.Name] = prop.Value;
-                }
+                    // Copy existing properties
+                    foreach (var prop in element.EnumerateObject())
+                    {
+                        properties[prop.Name] = prop.Value;
+                    }
 
-                if (remainingPath.Length == 0)
-                {
-                    // Remove this property
-                    if (!properties.Remove(segment))
-                        throw new JsonPatchException($"Property '{segment}' not found");
-                }
-                else
-                {
-                    // Navigate deeper
-                    if (!properties.TryGetValue(segment, out var childElement))
-                        throw new JsonPatchException($"Property '{segment}' not found");
-                    
-                    properties[segment] = RemoveValueAtPath(childElement, remainingPath);
-                }
+                    if (remainingPath.Length == 0)
+                    {
+                        // Remove this property
+                        if (!properties.Remove(segment))
+                            throw new JsonPatchException($"Property '{segment}' not found");
+                    }
+                    else
+                    {
+                        // Navigate deeper
+                        if (!properties.TryGetValue(segment, out var childElement))
+                            throw new JsonPatchException($"Property '{segment}' not found");
+                        
+                        properties[segment] = RemoveValueAtPath(childElement, remainingPath);
+                    }
 
-                return CreateJsonObject(properties);
+                    return CreateJsonObject(properties);
+                }
+                finally
+                {
+                    ReturnPooledDictionary(properties);
+                }
             }
             else if (element.ValueKind == JsonValueKind.Array)
             {

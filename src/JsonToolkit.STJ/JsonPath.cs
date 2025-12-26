@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace JsonToolkit.STJ
 {
@@ -7,6 +10,13 @@ namespace JsonToolkit.STJ
     /// </summary>
     public static class JsonPath
     {
+        // Cache for parsed path tokens to improve performance for repeated queries
+        private static readonly ConcurrentDictionary<string, List<PathToken>> PathCache = new();
+        
+        // Simple object pool for List<JsonElement> to reduce allocations
+        private static readonly ConcurrentQueue<List<JsonElement>> ListPool = new();
+        private const int MaxPoolSize = 100;
+
         /// <summary>
         /// Queries a JSON document using a JsonPath expression and returns all matching elements.
         /// </summary>
@@ -21,7 +31,8 @@ namespace JsonToolkit.STJ
             if (!path.StartsWith("$"))
                 throw new JsonPathException("JsonPath expression must start with '$'", path, 0);
 
-            var tokens = ParsePath(path);
+            // Use cached tokens for better performance
+            var tokens = PathCache.GetOrAdd(path, ParsePath);
             return EvaluateTokens(new[] { element }, tokens);
         }
 
@@ -36,6 +47,84 @@ namespace JsonToolkit.STJ
             var results = Query(element, path);
             using var enumerator = results.GetEnumerator();
             return enumerator.MoveNext() ? enumerator.Current : null;
+        }
+
+        /// <summary>
+        /// Queries a JSON document using a JsonPath expression and returns the first matching element as a strongly-typed object.
+        /// </summary>
+        /// <typeparam name="T">The type to deserialize the result to.</typeparam>
+        /// <param name="element">The JSON element to query.</param>
+        /// <param name="path">The JsonPath expression.</param>
+        /// <param name="options">Optional JsonSerializerOptions.</param>
+        /// <returns>The deserialized object, or default(T) if no matches found.</returns>
+        public static T? QueryFirst<T>(JsonElement element, string path, JsonSerializerOptions? options = null)
+        {
+            var result = QueryFirst(element, path);
+            return result.HasValue ? JsonSerializer.Deserialize<T>(result.Value, options) : default(T);
+        }
+
+        /// <summary>
+        /// Queries a JSON document using a JsonPath expression and returns all matching elements as strongly-typed objects.
+        /// </summary>
+        /// <typeparam name="T">The type to deserialize the results to.</typeparam>
+        /// <param name="element">The JSON element to query.</param>
+        /// <param name="path">The JsonPath expression.</param>
+        /// <param name="options">Optional JsonSerializerOptions.</param>
+        /// <returns>An enumerable of deserialized objects.</returns>
+        public static IEnumerable<T> Query<T>(JsonElement element, string path, JsonSerializerOptions? options = null)
+        {
+            var results = Query(element, path);
+            foreach (var result in results)
+            {
+                var obj = JsonSerializer.Deserialize<T>(result, options);
+                if (obj != null)
+                    yield return obj;
+            }
+        }
+
+        /// <summary>
+        /// Asynchronously queries a JSON document using a JsonPath expression and returns all matching elements as strongly-typed objects.
+        /// Useful for large documents to avoid blocking the thread.
+        /// </summary>
+        /// <typeparam name="T">The type to deserialize the results to.</typeparam>
+        /// <param name="element">The JSON element to query.</param>
+        /// <param name="path">The JsonPath expression.</param>
+        /// <param name="options">Optional JsonSerializerOptions.</param>
+        /// <param name="cancellationToken">Cancellation token to cancel the operation.</param>
+        /// <returns>An async enumerable of deserialized objects.</returns>
+        public static async IAsyncEnumerable<T> QueryAsync<T>(JsonElement element, string path, JsonSerializerOptions? options = null, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            var results = Query(element, path);
+            foreach (var result in results)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                
+                // Yield control periodically for large result sets
+                await Task.Yield();
+                
+                var obj = JsonSerializer.Deserialize<T>(result, options);
+                if (obj != null)
+                    yield return obj;
+            }
+        }
+
+        private static List<JsonElement> GetPooledList()
+        {
+            if (ListPool.TryDequeue(out var list))
+            {
+                list.Clear();
+                return list;
+            }
+            return new List<JsonElement>();
+        }
+
+        private static void ReturnPooledList(List<JsonElement> list)
+        {
+            if (ListPool.Count < MaxPoolSize)
+            {
+                list.Clear();
+                ListPool.Enqueue(list);
+            }
         }
 
         private static List<PathToken> ParsePath(string path)
@@ -61,23 +150,28 @@ namespace JsonToolkit.STJ
                     if (closeBracket == -1)
                         throw new JsonPathException("Unclosed bracket in JsonPath expression", path, i);
 
-                    var content = path.Substring(i, closeBracket - i);
+                    var contentLength = closeBracket - i;
+                    var content = path.Substring(i, contentLength);
                     
                     if (content == "*")
                     {
                         tokens.Add(new PathToken { Type = TokenType.Wildcard });
                     }
-                    else if (content.StartsWith("?"))
+                    else if (content.Length > 0 && content[0] == '?')
                     {
-                        tokens.Add(new PathToken { Type = TokenType.Filter, Filter = content.Substring(1).Trim('(', ')') });
+                        var filterContent = content.Substring(1);
+                        // Remove parentheses if present - more efficient than Trim
+                        if (filterContent.Length >= 2 && filterContent[0] == '(' && filterContent[filterContent.Length - 1] == ')')
+                            filterContent = filterContent.Substring(1, filterContent.Length - 2);
+                        tokens.Add(new PathToken { Type = TokenType.Filter, Filter = filterContent });
                     }
                     else if (int.TryParse(content, out var index))
                     {
                         tokens.Add(new PathToken { Type = TokenType.ArrayIndex, Index = index });
                     }
-                    else if (content.StartsWith("'") && content.EndsWith("'"))
+                    else if (content.Length >= 2 && content[0] == '\'' && content[content.Length - 1] == '\'')
                     {
-                        tokens.Add(new PathToken { Type = TokenType.Property, Property = content.Trim('\'') });
+                        tokens.Add(new PathToken { Type = TokenType.Property, Property = content.Substring(1, content.Length - 2) });
                     }
                     else
                     {
@@ -97,9 +191,11 @@ namespace JsonToolkit.STJ
                     while (end < path.Length && path[end] != '.' && path[end] != '[')
                         end++;
 
-                    var property = path.Substring(i, end - i);
-                    if (!string.IsNullOrEmpty(property))
+                    if (end > i) // More efficient than checking string.IsNullOrEmpty
+                    {
+                        var property = path.Substring(i, end - i);
                         tokens.Add(new PathToken { Type = TokenType.Property, Property = property });
+                    }
 
                     i = end;
                 }
@@ -143,10 +239,18 @@ namespace JsonToolkit.STJ
             {
                 if (element.ValueKind == JsonValueKind.Array)
                 {
-                    var array = element.EnumerateArray().ToList();
-                    var actualIndex = index < 0 ? array.Count + index : index;
-                    if (actualIndex >= 0 && actualIndex < array.Count)
-                        yield return array[actualIndex];
+                    var array = GetPooledList();
+                    try
+                    {
+                        array.AddRange(element.EnumerateArray());
+                        var actualIndex = index < 0 ? array.Count + index : index;
+                        if (actualIndex >= 0 && actualIndex < array.Count)
+                            yield return array[actualIndex];
+                    }
+                    finally
+                    {
+                        ReturnPooledList(array);
+                    }
                 }
             }
         }

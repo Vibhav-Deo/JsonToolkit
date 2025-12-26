@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Linq;
 
 namespace JsonToolkit.STJ;
@@ -8,6 +9,8 @@ namespace JsonToolkit.STJ;
 public class JElement
 {
         private readonly JsonElement _element;
+        private readonly ConcurrentDictionary<string, JElement?> _propertyCache = new();
+        private readonly ConcurrentDictionary<int, JElement?> _indexCache = new();
 
         private JElement(JsonElement element)
         {
@@ -43,7 +46,7 @@ public class JElement
         }
 
         /// <summary>
-        /// Indexer for property access.
+        /// Indexer for property access with caching.
         /// </summary>
         public JElement? this[string propertyName]
         {
@@ -52,14 +55,14 @@ public class JElement
                 if (_element.ValueKind != JsonValueKind.Object)
                     return null;
 
-                return _element.TryGetProperty(propertyName, out var prop)
-                    ? new JElement(prop)
-                    : null;
+                // Use cached result if available
+                return _propertyCache.GetOrAdd(propertyName, name =>
+                    _element.TryGetProperty(name, out var prop) ? new JElement(prop) : null);
             }
         }
 
         /// <summary>
-        /// Indexer for array access.
+        /// Indexer for array access with caching for small indices.
         /// </summary>
         public JElement? this[int index]
         {
@@ -71,13 +74,31 @@ public class JElement
                 if (index < 0)
                     return null;
 
-                var arrayEnumerator = _element.EnumerateArray();
-                var currentIndex = 0;
-                foreach (var item in arrayEnumerator)
+                // Cache only small indices to avoid memory bloat
+                if (index < 100)
                 {
-                    if (currentIndex == index)
+                    return _indexCache.GetOrAdd(index, idx =>
+                    {
+                        var arrayEnumerator = _element.EnumerateArray();
+                        var currentIndex = 0;
+                        foreach (var item in arrayEnumerator)
+                        {
+                            if (currentIndex == idx)
+                                return new JElement(item);
+                            currentIndex++;
+                        }
+                        return null;
+                    });
+                }
+
+                // For large indices, don't cache
+                var enumerator = _element.EnumerateArray();
+                var current = 0;
+                foreach (var item in enumerator)
+                {
+                    if (current == index)
                         return new JElement(item);
-                    currentIndex++;
+                    current++;
                 }
 
                 return null;

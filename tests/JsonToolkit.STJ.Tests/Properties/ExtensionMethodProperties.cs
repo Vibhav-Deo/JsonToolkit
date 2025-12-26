@@ -125,21 +125,22 @@ namespace JsonToolkit.STJ.Tests.Properties
                     BoolValue = boolVal 
                 };
                 
+                // Use GetAwaiter().GetResult() instead of .Result to avoid deadlocks
                 return Task.Run(async () =>
                 {
                     using var stream = new MemoryStream();
                     
                     // Serialize to stream
-                    await testObj.ToJsonAsync(stream);
+                    await testObj.ToJsonAsync(stream).ConfigureAwait(false);
                     
                     // Reset stream position
                     stream.Position = 0;
                     
                     // Deserialize from stream
-                    var roundTrip = await stream.FromJsonAsync<SimpleTestObject>();
+                    var roundTrip = await stream.FromJsonAsync<SimpleTestObject>().ConfigureAwait(false);
                     
                     return AreSimpleObjectsEquivalent(testObj, roundTrip);
-                }).Result;
+                }).GetAwaiter().GetResult();
             }
             catch (Exception)
             {

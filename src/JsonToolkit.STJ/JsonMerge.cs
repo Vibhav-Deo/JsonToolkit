@@ -218,7 +218,9 @@ public static class JsonMerge
         /// <returns>A new JsonElement containing the properties.</returns>
         private static JsonElement CreateJsonElementFromDictionary(Dictionary<string, JsonElement> properties)
         {
-            using var stream = new System.IO.MemoryStream();
+            // Pre-size the stream to reduce allocations - estimate based on property count
+            var estimatedSize = properties.Count * 50; // Rough estimate: 50 bytes per property
+            using var stream = new System.IO.MemoryStream(estimatedSize);
             using var writer = new Utf8JsonWriter(stream);
 
             writer.WriteStartObject();

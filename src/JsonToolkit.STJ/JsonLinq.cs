@@ -96,29 +96,37 @@ namespace JsonToolkit.STJ
         }
 
         /// <summary>
-        /// Returns the number of elements in a JSON array.
+        /// Returns the number of elements in a JSON array (optimized).
         /// </summary>
         public static int Count(this JsonElement element)
         {
             if (element.ValueKind != JsonValueKind.Array)
                 return 0;
 
+            // Use GetArrayLength() for better performance when available
             return element.GetArrayLength();
         }
 
         /// <summary>
-        /// Returns the number of elements that satisfy a condition.
+        /// Returns the number of elements that satisfy a condition (optimized).
         /// </summary>
         public static int Count(this JsonElement element, Func<JsonElement, bool> predicate)
         {
             if (element.ValueKind != JsonValueKind.Array)
                 return 0;
 
-            return element.EnumerateArray().Count(predicate);
+            // Optimized counting without creating intermediate collections
+            int count = 0;
+            foreach (var item in element.EnumerateArray())
+            {
+                if (predicate(item))
+                    count++;
+            }
+            return count;
         }
 
         /// <summary>
-        /// Computes the sum of numeric values in a JSON array.
+        /// Computes the sum of numeric values in a JSON array (optimized).
         /// </summary>
         public static double Sum(this JsonElement element)
         {
@@ -129,25 +137,36 @@ namespace JsonToolkit.STJ
             foreach (var item in element.EnumerateArray())
             {
                 if (item.ValueKind == JsonValueKind.Number)
-                    sum += item.GetDouble();
+                {
+                    // Try integer first for better performance
+                    if (item.TryGetInt64(out var intVal))
+                        sum += intVal;
+                    else
+                        sum += item.GetDouble();
+                }
             }
 
             return sum;
         }
 
         /// <summary>
-        /// Computes the sum of values selected from JSON elements.
+        /// Computes the sum of values selected from JSON elements (optimized).
         /// </summary>
         public static double Sum(this JsonElement element, Func<JsonElement, double> selector)
         {
             if (element.ValueKind != JsonValueKind.Array)
                 return 0;
 
-            return element.EnumerateArray().Sum(selector);
+            double sum = 0;
+            foreach (var item in element.EnumerateArray())
+            {
+                sum += selector(item);
+            }
+            return sum;
         }
 
         /// <summary>
-        /// Computes the average of numeric values in a JSON array.
+        /// Computes the average of numeric values in a JSON array (optimized).
         /// </summary>
         public static double Average(this JsonElement element)
         {
@@ -161,7 +180,11 @@ namespace JsonToolkit.STJ
             {
                 if (item.ValueKind == JsonValueKind.Number)
                 {
-                    sum += item.GetDouble();
+                    // Try integer first for better performance
+                    if (item.TryGetInt64(out var intVal))
+                        sum += intVal;
+                    else
+                        sum += item.GetDouble();
                     count++;
                 }
             }

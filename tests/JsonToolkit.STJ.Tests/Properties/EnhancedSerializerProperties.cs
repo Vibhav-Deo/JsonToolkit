@@ -139,21 +139,22 @@ namespace JsonToolkit.STJ.Tests.Properties
                     DoubleValue = doubleVal
                 };
                 
+                // Use GetAwaiter().GetResult() instead of .Result to avoid deadlocks
                 return Task.Run(async () =>
                 {
                     using var stream = new MemoryStream();
                     
                     // Serialize to stream
-                    await JsonSerializerExtensions.SerializeEnhancedAsync(stream, testObj);
+                    await JsonSerializerExtensions.SerializeEnhancedAsync(stream, testObj).ConfigureAwait(false);
                     
                     // Reset stream position
                     stream.Position = 0;
                     
                     // Deserialize from stream
-                    var roundTrip = await JsonSerializerExtensions.DeserializeEnhancedAsync<EnhancedTestObject>(stream);
+                    var roundTrip = await JsonSerializerExtensions.DeserializeEnhancedAsync<EnhancedTestObject>(stream).ConfigureAwait(false);
                     
                     return AreEnhancedObjectsEquivalent(testObj, roundTrip);
-                }).Result;
+                }).GetAwaiter().GetResult();
             }
             catch (Exception)
             {

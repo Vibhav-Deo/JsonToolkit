@@ -672,9 +672,6 @@ dotnet test
 
 # Build release package
 dotnet pack --configuration Release
-
-# Validate OIDC setup (in GitHub Actions)
-./scripts/validate-oidc-setup.sh
 ```
 
 ## 🤝 Contributing
