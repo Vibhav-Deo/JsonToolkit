@@ -3,324 +3,326 @@ using System.Linq;
 using System.Reflection;
 
 namespace JsonToolkit.STJ.Converters;
+
+/// <summary>
+/// Converter that provides enhanced case-insensitive property matching with ambiguity detection.
+/// </summary>
+/// <typeparam name="T">The type to convert.</typeparam>
+public class CaseInsensitivePropertyConverter<T> : SimpleJsonConverter<T> where T : class, new()
+{
+    private readonly CaseInsensitivePropertyOptions _options;
+    private readonly Dictionary<string, PropertyInfo> _propertyMap;
+    private readonly HashSet<string> _ambiguousProperties;
+
     /// <summary>
-    /// Converter that provides enhanced case-insensitive property matching with ambiguity detection.
+    /// Initializes a new instance of the CaseInsensitivePropertyConverter class.
     /// </summary>
-    /// <typeparam name="T">The type to convert.</typeparam>
-    public class CaseInsensitivePropertyConverter<T> : SimpleJsonConverter<T> where T : class, new()
+    /// <param name="options">Options for case-insensitive property matching.</param>
+    public CaseInsensitivePropertyConverter(CaseInsensitivePropertyOptions? options = null)
     {
-        private readonly CaseInsensitivePropertyOptions _options;
-        private readonly Dictionary<string, PropertyInfo> _propertyMap;
-        private readonly HashSet<string> _ambiguousProperties;
+        _options = options ?? new CaseInsensitivePropertyOptions();
+        _propertyMap = new Dictionary<string, PropertyInfo>();
+        _ambiguousProperties = new HashSet<string>();
 
-        /// <summary>
-        /// Initializes a new instance of the CaseInsensitivePropertyConverter class.
-        /// </summary>
-        /// <param name="options">Options for case-insensitive property matching.</param>
-        public CaseInsensitivePropertyConverter(CaseInsensitivePropertyOptions? options = null)
+        BuildPropertyMap();
+    }
+
+    /// <summary>
+    /// Gets the converter name for debugging purposes.
+    /// </summary>
+    public override string ConverterName => $"CaseInsensitivePropertyConverter<{typeof(T).Name}>";
+
+    /// <summary>
+    /// Gets the converter precedence for ordering when multiple converters apply.
+    /// </summary>
+    public override int Precedence => 10; // Higher precedence than default converters
+
+    /// <summary>
+    /// Reads and converts the JSON to the specified type.
+    /// </summary>
+    protected override T ReadValue(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.StartObject)
         {
-            _options = options ?? new CaseInsensitivePropertyOptions();
-            _propertyMap = new Dictionary<string, PropertyInfo>();
-            _ambiguousProperties = new HashSet<string>();
-            
-            BuildPropertyMap();
+            throw new JsonException($"Expected StartObject token, got {reader.TokenType}");
         }
 
-        /// <summary>
-        /// Gets the converter name for debugging purposes.
-        /// </summary>
-        public override string ConverterName => $"CaseInsensitivePropertyConverter<{typeof(T).Name}>";
+        var instance = new T();
+        var processedProperties = new HashSet<string>();
 
-        /// <summary>
-        /// Gets the converter precedence for ordering when multiple converters apply.
-        /// </summary>
-        public override int Precedence => 10; // Higher precedence than default converters
-
-        /// <summary>
-        /// Reads and converts the JSON to the specified type.
-        /// </summary>
-        protected override T ReadValue(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        while (reader.Read())
         {
-            if (reader.TokenType != JsonTokenType.StartObject)
+            if (reader.TokenType == JsonTokenType.EndObject)
             {
-                throw new JsonException($"Expected StartObject token, got {reader.TokenType}");
+                break;
             }
 
-            var instance = new T();
-            var processedProperties = new HashSet<string>();
-
-            while (reader.Read())
+            if (reader.TokenType != JsonTokenType.PropertyName)
             {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                {
-                    break;
-                }
+                throw new JsonException($"Expected PropertyName token, got {reader.TokenType}");
+            }
 
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException($"Expected PropertyName token, got {reader.TokenType}");
-                }
+            var propertyName = reader.GetString();
+            if (string.IsNullOrEmpty(propertyName))
+            {
+                reader.Skip();
+                continue;
+            }
 
-                var propertyName = reader.GetString();
-                if (string.IsNullOrEmpty(propertyName))
-                {
-                    reader.Skip();
-                    continue;
-                }
+            // Find the matching property using case-insensitive logic
+            var matchedProperty = FindMatchingProperty(propertyName!, processedProperties);
 
-                // Find the matching property using case-insensitive logic
-                var matchedProperty = FindMatchingProperty(propertyName!, processedProperties);
-                
-                if (matchedProperty == null)
-                {
-                    // Skip unknown properties
-                    reader.Read();
-                    reader.Skip();
-                    continue;
-                }
-
-                // Read the property value
+            if (matchedProperty == null)
+            {
+                // Skip unknown properties
                 reader.Read();
-                var propertyValue = JsonSerializer.Deserialize(ref reader, matchedProperty.PropertyType, options);
-                
-                // Set the property value
-                if (matchedProperty.CanWrite)
-                {
-                    matchedProperty.SetValue(instance, propertyValue);
-                    processedProperties.Add(GetPropertyKey(matchedProperty.Name));
-                }
+                reader.Skip();
+                continue;
             }
 
-            return instance;
-        }
+            // Read the property value
+            reader.Read();
+            var propertyValue = JsonSerializer.Deserialize(ref reader, matchedProperty.PropertyType, options);
 
-        /// <summary>
-        /// Writes the specified value as JSON.
-        /// </summary>
-        protected override void WriteValue(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
-        {
-            writer.WriteStartObject();
-
-            var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanRead && !p.GetCustomAttributes<JsonIgnoreAttribute>().Any());
-
-            foreach (var property in properties)
+            // Set the property value
+            if (matchedProperty.CanWrite)
             {
-                var propertyValue = property.GetValue(value);
-                
-                // Apply naming policy if available
-                var propertyName = GetSerializedPropertyName(property, options);
-                
-                writer.WritePropertyName(propertyName);
-                JsonSerializer.Serialize(writer, propertyValue, property.PropertyType, options);
-            }
-
-            writer.WriteEndObject();
-        }
-
-        /// <summary>
-        /// Builds the property map for case-insensitive matching.
-        /// </summary>
-        private void BuildPropertyMap()
-        {
-            var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanRead || p.CanWrite);
-
-            var propertyGroups = new Dictionary<string, List<PropertyInfo>>();
-
-            // Group properties by their normalized names
-            foreach (var property in properties)
-            {
-                var normalizedName = GetPropertyKey(property.Name);
-                
-                if (!propertyGroups.ContainsKey(normalizedName))
-                {
-                    propertyGroups[normalizedName] = new List<PropertyInfo>();
-                }
-                
-                propertyGroups[normalizedName].Add(property);
-            }
-
-            // Build the property map and detect ambiguities
-            foreach (var group in propertyGroups)
-            {
-                if (group.Value.Count > 1)
-                {
-                    // Multiple properties with the same normalized name - this is ambiguous
-                    _ambiguousProperties.Add(group.Key);
-                    
-                    if (_options.StrictMode)
-                    {
-                        throw new JsonToolkitException(
-                            $"Ambiguous property names detected for type '{typeof(T).Name}': " +
-                            $"{string.Join(", ", group.Value.Select(p => p.Name))}. " +
-                            "These properties differ only by case. Use strict mode to require exact case matching.",
-                            operation: "BuildPropertyMap"
-                        );
-                    }
-                    
-                    // In non-strict mode, use the first property found
-                    _propertyMap[group.Key] = group.Value.First();
-                }
-                else
-                {
-                    _propertyMap[group.Key] = group.Value.First();
-                }
+                matchedProperty.SetValue(instance, propertyValue);
+                processedProperties.Add(GetPropertyKey(matchedProperty.Name));
             }
         }
 
-        /// <summary>
-        /// Finds a matching property for the given JSON property name.
-        /// </summary>
-        private PropertyInfo? FindMatchingProperty(string jsonPropertyName, HashSet<string> processedProperties)
+        return instance;
+    }
+
+    /// <summary>
+    /// Writes the specified value as JSON.
+    /// </summary>
+    protected override void WriteValue(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
+    {
+        writer.WriteStartObject();
+
+        var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanRead && !p.GetCustomAttributes<JsonIgnoreAttribute>().Any());
+
+        foreach (var property in properties)
         {
-            if (_options.StrictMode)
+            var propertyValue = property.GetValue(value);
+
+            // Apply naming policy if available
+            var propertyName = GetSerializedPropertyName(property, options);
+
+            writer.WritePropertyName(propertyName);
+            JsonSerializer.Serialize(writer, propertyValue, property.PropertyType, options);
+        }
+
+        writer.WriteEndObject();
+    }
+
+    /// <summary>
+    /// Builds the property map for case-insensitive matching.
+    /// </summary>
+    private void BuildPropertyMap()
+    {
+        var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanRead || p.CanWrite);
+
+        var propertyGroups = new Dictionary<string, List<PropertyInfo>>();
+
+        // Group properties by their normalized names
+        foreach (var property in properties)
+        {
+            var normalizedName = GetPropertyKey(property.Name);
+
+            if (!propertyGroups.ContainsKey(normalizedName))
             {
-                // In strict mode, require exact case matching
-                var exactMatch = typeof(T).GetProperty(jsonPropertyName, BindingFlags.Public | BindingFlags.Instance);
-                if (exactMatch != null)
-                {
-                    var exactKey = GetPropertyKey(exactMatch.Name);
-                    if (!processedProperties.Contains(exactKey))
-                    {
-                        return exactMatch;
-                    }
-                }
-                return null;
+                propertyGroups[normalizedName] = new List<PropertyInfo>();
             }
 
-            // Case-insensitive matching
-            var normalizedName = GetPropertyKey(jsonPropertyName);
-            
-            if (_propertyMap.TryGetValue(normalizedName, out var property))
+            propertyGroups[normalizedName].Add(property);
+        }
+
+        // Build the property map and detect ambiguities
+        foreach (var group in propertyGroups)
+        {
+            if (group.Value.Count > 1)
             {
-                var propertyKey = GetPropertyKey(property.Name);
-                
-                // Check if this property has already been processed
-                if (processedProperties.Contains(propertyKey))
+                // Multiple properties with the same normalized name - this is ambiguous
+                _ambiguousProperties.Add(group.Key);
+
+                if (_options.StrictMode)
                 {
-                    return null;
+                    throw new JsonToolkitException(
+                        $"Ambiguous property names detected for type '{typeof(T).Name}': " +
+                        $"{string.Join(", ", group.Value.Select(p => p.Name))}. " +
+                        "These properties differ only by case. Use strict mode to require exact case matching.",
+                        operation: "BuildPropertyMap"
+                    );
                 }
 
-                // Check for ambiguity
-                if (_ambiguousProperties.Contains(normalizedName))
-                {
-                    if (_options.ThrowOnAmbiguity)
-                    {
-                        throw new JsonToolkitException(
-                            $"Ambiguous property name '{jsonPropertyName}' for type '{typeof(T).Name}'. " +
-                            "Multiple properties match this name when case is ignored. " +
-                            "Use exact case matching or enable strict mode.",
-                            propertyPath: jsonPropertyName,
-                            operation: "FindMatchingProperty"
-                        );
-                    }
-                }
+                // In non-strict mode, use the first property found
+                _propertyMap[group.Key] = group.Value.First();
+            }
+            else
+            {
+                _propertyMap[group.Key] = group.Value.First();
+            }
+        }
+    }
 
-                return property;
+    /// <summary>
+    /// Finds a matching property for the given JSON property name.
+    /// </summary>
+    private PropertyInfo? FindMatchingProperty(string jsonPropertyName, HashSet<string> processedProperties)
+    {
+        if (_options.StrictMode)
+        {
+            // In strict mode, require exact case matching
+            var exactMatch = typeof(T).GetProperty(jsonPropertyName, BindingFlags.Public | BindingFlags.Instance);
+            if (exactMatch != null)
+            {
+                var exactKey = GetPropertyKey(exactMatch.Name);
+                if (!processedProperties.Contains(exactKey))
+                {
+                    return exactMatch;
+                }
             }
 
             return null;
         }
 
-        /// <summary>
-        /// Gets the normalized property key for case-insensitive comparison.
-        /// </summary>
-        private string GetPropertyKey(string propertyName)
-        {
-            if (string.IsNullOrEmpty(propertyName))
-                return string.Empty;
+        // Case-insensitive matching
+        var normalizedName = GetPropertyKey(jsonPropertyName);
 
-            switch (_options.ComparisonMode)
+        if (_propertyMap.TryGetValue(normalizedName, out var property))
+        {
+            var propertyKey = GetPropertyKey(property.Name);
+
+            // Check if this property has already been processed
+            if (processedProperties.Contains(propertyKey))
             {
-                case CaseInsensitiveComparisonMode.InvariantCultureIgnoreCase:
-                    return propertyName.ToUpperInvariant();
-                    
-                case CaseInsensitiveComparisonMode.CurrentCultureIgnoreCase:
-                    return propertyName.ToUpper(CultureInfo.CurrentCulture);
-                    
-                case CaseInsensitiveComparisonMode.OrdinalIgnoreCase:
-                default:
-                    return propertyName.ToUpperInvariant();
+                return null;
             }
+
+            // Check for ambiguity
+            if (_ambiguousProperties.Contains(normalizedName))
+            {
+                if (_options.ThrowOnAmbiguity)
+                {
+                    throw new JsonToolkitException(
+                        $"Ambiguous property name '{jsonPropertyName}' for type '{typeof(T).Name}'. " +
+                        "Multiple properties match this name when case is ignored. " +
+                        "Use exact case matching or enable strict mode.",
+                        propertyPath: jsonPropertyName,
+                        operation: "FindMatchingProperty"
+                    );
+                }
+            }
+
+            return property;
         }
 
-        /// <summary>
-        /// Gets the serialized property name, applying naming policies if available.
-        /// </summary>
-        private string GetSerializedPropertyName(PropertyInfo property, JsonSerializerOptions options)
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the normalized property key for case-insensitive comparison.
+    /// </summary>
+    private string GetPropertyKey(string propertyName)
+    {
+        if (string.IsNullOrEmpty(propertyName))
+            return string.Empty;
+
+        switch (_options.ComparisonMode)
         {
-            // Check for JsonPropertyName attribute
-            var jsonPropertyNameAttr = property.GetCustomAttribute<JsonPropertyNameAttribute>();
-            if (jsonPropertyNameAttr != null)
-            {
-                return jsonPropertyNameAttr.Name;
-            }
+            case CaseInsensitiveComparisonMode.InvariantCultureIgnoreCase:
+                return propertyName.ToUpperInvariant();
 
-            // Apply naming policy if available
-            if (options.PropertyNamingPolicy != null)
-            {
-                return options.PropertyNamingPolicy.ConvertName(property.Name);
-            }
+            case CaseInsensitiveComparisonMode.CurrentCultureIgnoreCase:
+                return propertyName.ToUpper(CultureInfo.CurrentCulture);
 
-            return property.Name;
-        }
-
-        /// <summary>
-        /// Determines whether this converter can convert the specified type.
-        /// </summary>
-        protected override bool CanConvertType(Type typeToConvert)
-        {
-            return typeToConvert == typeof(T) && 
-                   typeToConvert.IsClass && 
-                   !typeToConvert.IsAbstract &&
-                   typeToConvert.GetConstructor(Type.EmptyTypes) != null;
+            case CaseInsensitiveComparisonMode.OrdinalIgnoreCase:
+            default:
+                return propertyName.ToUpperInvariant();
         }
     }
 
     /// <summary>
-    /// Options for configuring case-insensitive property matching behavior.
+    /// Gets the serialized property name, applying naming policies if available.
     /// </summary>
-    public class CaseInsensitivePropertyOptions
+    private string GetSerializedPropertyName(PropertyInfo property, JsonSerializerOptions options)
     {
-        /// <summary>
-        /// Gets or sets whether to use strict mode (case-sensitive matching).
-        /// </summary>
-        public bool StrictMode { get; set; } = false;
+        // Check for JsonPropertyName attribute
+        var jsonPropertyNameAttr = property.GetCustomAttribute<JsonPropertyNameAttribute>();
+        if (jsonPropertyNameAttr != null)
+        {
+            return jsonPropertyNameAttr.Name;
+        }
 
-        /// <summary>
-        /// Gets or sets whether to throw an exception when ambiguous property names are encountered.
-        /// </summary>
-        public bool ThrowOnAmbiguity { get; set; } = false;
+        // Apply naming policy if available
+        if (options.PropertyNamingPolicy != null)
+        {
+            return options.PropertyNamingPolicy.ConvertName(property.Name);
+        }
 
-        /// <summary>
-        /// Gets or sets the comparison mode for case-insensitive matching.
-        /// </summary>
-        public CaseInsensitiveComparisonMode ComparisonMode { get; set; } = CaseInsensitiveComparisonMode.OrdinalIgnoreCase;
-
-        /// <summary>
-        /// Gets or sets whether to handle special characters consistently across casing modes.
-        /// </summary>
-        public bool NormalizeSpecialCharacters { get; set; } = true;
+        return property.Name;
     }
 
     /// <summary>
-    /// Defines the comparison mode for case-insensitive property matching.
+    /// Determines whether this converter can convert the specified type.
     /// </summary>
-    public enum CaseInsensitiveComparisonMode
+    protected override bool CanConvertType(Type typeToConvert)
     {
-        /// <summary>
-        /// Use ordinal (binary) comparison, ignoring case.
-        /// </summary>
-        OrdinalIgnoreCase,
-
-        /// <summary>
-        /// Use invariant culture comparison, ignoring case.
-        /// </summary>
-        InvariantCultureIgnoreCase,
-
-        /// <summary>
-        /// Use current culture comparison, ignoring case.
-        /// </summary>
-        CurrentCultureIgnoreCase
+        return typeToConvert == typeof(T) &&
+               typeToConvert.IsClass &&
+               !typeToConvert.IsAbstract &&
+               typeToConvert.GetConstructor(Type.EmptyTypes) != null;
     }
+}
+
+/// <summary>
+/// Options for configuring case-insensitive property matching behavior.
+/// </summary>
+public class CaseInsensitivePropertyOptions
+{
+    /// <summary>
+    /// Gets or sets whether to use strict mode (case-sensitive matching).
+    /// </summary>
+    public bool StrictMode { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets whether to throw an exception when ambiguous property names are encountered.
+    /// </summary>
+    public bool ThrowOnAmbiguity { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the comparison mode for case-insensitive matching.
+    /// </summary>
+    public CaseInsensitiveComparisonMode ComparisonMode { get; set; } = CaseInsensitiveComparisonMode.OrdinalIgnoreCase;
+
+    /// <summary>
+    /// Gets or sets whether to handle special characters consistently across casing modes.
+    /// </summary>
+    public bool NormalizeSpecialCharacters { get; set; } = true;
+}
+
+/// <summary>
+/// Defines the comparison mode for case-insensitive property matching.
+/// </summary>
+public enum CaseInsensitiveComparisonMode
+{
+    /// <summary>
+    /// Use ordinal (binary) comparison, ignoring case.
+    /// </summary>
+    OrdinalIgnoreCase,
+
+    /// <summary>
+    /// Use invariant culture comparison, ignoring case.
+    /// </summary>
+    InvariantCultureIgnoreCase,
+
+    /// <summary>
+    /// Use current culture comparison, ignoring case.
+    /// </summary>
+    CurrentCultureIgnoreCase
+}

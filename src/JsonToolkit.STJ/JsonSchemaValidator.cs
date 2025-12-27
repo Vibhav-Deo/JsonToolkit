@@ -41,7 +41,8 @@ public class JsonSchemaValidator
             var expectedType = typeProperty.GetString();
             if (!ValidateType(element, expectedType))
             {
-                errors.Add(new ValidationError(path, $"Expected type '{expectedType}' but got '{GetJsonType(element)}'", "TypeError"));
+                errors.Add(new ValidationError(path, $"Expected type '{expectedType}' but got '{GetJsonType(element)}'",
+                    "TypeError"));
                 return;
             }
         }
@@ -58,14 +59,16 @@ public class JsonSchemaValidator
 
     private void ValidateObject(JsonElement element, JsonElement schema, string path, List<ValidationError> errors)
     {
-        if (schema.TryGetProperty("required", out var requiredProperty) && requiredProperty.ValueKind == JsonValueKind.Array)
+        if (schema.TryGetProperty("required", out var requiredProperty) &&
+            requiredProperty.ValueKind == JsonValueKind.Array)
         {
             foreach (var reqProp in requiredProperty.EnumerateArray())
             {
                 var propName = reqProp.GetString();
                 if (propName != null && !element.TryGetProperty(propName, out _))
                 {
-                    errors.Add(new ValidationError($"{path}.{propName}", $"Required property '{propName}' is missing", "RequiredProperty"));
+                    errors.Add(new ValidationError($"{path}.{propName}", $"Required property '{propName}' is missing",
+                        "RequiredProperty"));
                 }
             }
         }
