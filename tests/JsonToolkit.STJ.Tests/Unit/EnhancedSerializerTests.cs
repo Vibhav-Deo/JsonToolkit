@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Xunit;
 using JsonToolkit.STJ;
+using JsonToolkit.STJ.ValidationAttributes;
 
 namespace JsonToolkit.STJ.Tests.Unit
 {
@@ -191,10 +194,230 @@ namespace JsonToolkit.STJ.Tests.Unit
             Assert.Equal(testObj.Value, crossResult2.Value);
         }
 
+        // New tests for automatic validation enforcement
+
+        [Fact]
+        public void Deserialize_WithValidationAttributes_ShouldValidateAutomatically()
+        {
+            // Arrange
+            var invalidJson = """{"Name":"x","Age":-5}"""; // Name too short, Age negative
+            var options = new JsonSerializerOptions().WithValidation();
+
+            // Act & Assert
+            var exception = Assert.Throws<JsonValidationException>(() =>
+                JsonSerializer.Deserialize<ValidatedTestObject>(invalidJson, options));
+            
+            Assert.NotNull(exception.ValidationErrors);
+            Assert.True(exception.ValidationErrors.Count > 0);
+            Assert.Contains(exception.ValidationErrors, e => e.PropertyPath == "Name");
+            Assert.Contains(exception.ValidationErrors, e => e.PropertyPath == "Age");
+        }
+
+        [Fact]
+        public void Deserialize_WithValidationAttributes_ValidData_ShouldSucceed()
+        {
+            // Arrange
+            var validJson = """{"Name":"ValidName","Age":25}""";
+            var options = new JsonSerializerOptions().WithValidation();
+
+            // Act
+            var result = JsonSerializer.Deserialize<ValidatedTestObject>(validJson, options);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal("ValidName", result.Name);
+            Assert.Equal(25, result.Age);
+        }
+
+        [Fact]
+        public void Deserialize_EnableJsonToolkit_ShouldValidateByDefault()
+        {
+            // Arrange
+            var invalidJson = """{"Name":"x","Age":-5}"""; // Name too short, Age negative
+            var options = new JsonSerializerOptions().EnableJsonToolkit();
+
+            // Act & Assert
+            var exception = Assert.Throws<JsonValidationException>(() =>
+                JsonSerializer.Deserialize<ValidatedTestObject>(invalidJson, options));
+            
+            Assert.NotNull(exception.ValidationErrors);
+            Assert.True(exception.ValidationErrors.Count > 0);
+        }
+
+        [Fact]
+        public void Deserialize_WithoutValidationAttributes_ShouldNotValidate()
+        {
+            // Arrange
+            var json = """{"Name":"AnyName","Value":999}""";
+            var options = new JsonSerializerOptions().WithValidation();
+
+            // Act - Should not throw because TestObject has no validation attributes
+            var result = JsonSerializer.Deserialize<TestObject>(json, options);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal("AnyName", result.Name);
+            Assert.Equal(999, result.Value);
+        }
+
+        [Fact]
+        public void Deserialize_ValidationErrorMessages_ShouldBeDescriptive()
+        {
+            // Arrange
+            var invalidJson = """{"Name":"","Age":150}"""; // Empty name, age too high
+            var options = new JsonSerializerOptions().WithValidation();
+
+            // Act & Assert
+            var exception = Assert.Throws<JsonValidationException>(() =>
+                JsonSerializer.Deserialize<ValidatedTestObject>(invalidJson, options));
+            
+            Assert.NotNull(exception.ValidationErrors);
+            Assert.True(exception.ValidationErrors.Count > 0);
+            
+            // Check that error messages are descriptive
+            var nameError = exception.ValidationErrors.Where(e => e.PropertyPath == "Name").FirstOrDefault();
+            var ageError = exception.ValidationErrors.Where(e => e.PropertyPath == "Age").FirstOrDefault();
+            
+            Assert.NotNull(nameError);
+            Assert.NotNull(ageError);
+            Assert.Contains("length", nameError.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("must be", ageError.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void Deserialize_MultipleValidationErrors_ShouldCollectAll()
+        {
+            // Arrange
+            var invalidJson = """{"Name":"x","Age":-5,"Email":"invalid"}"""; // All fields invalid
+            var options = new JsonSerializerOptions().WithValidation();
+
+            // Act & Assert
+            var exception = Assert.Throws<JsonValidationException>(() =>
+                JsonSerializer.Deserialize<ComplexValidatedObject>(invalidJson, options));
+            
+            Assert.NotNull(exception.ValidationErrors);
+            Assert.True(exception.ValidationErrors.Count >= 3); // Should have errors for all three properties
+            
+            var propertyPaths = new HashSet<string>(exception.ValidationErrors.Select(e => e.PropertyPath));
+            Assert.Contains("Name", propertyPaths);
+            Assert.Contains("Age", propertyPaths);
+            Assert.Contains("Email", propertyPaths);
+        }
+
+        // New tests for validation opt-out scenarios
+
+        [Fact]
+        public void Deserialize_WithoutValidation_ShouldAllowInvalidData()
+        {
+            // Arrange
+            var invalidJson = """{"Name":"x","Age":-5}"""; // Name too short, Age negative
+            var options = new JsonSerializerOptions().WithValidation().WithoutValidation();
+
+            // Act - Should not throw because validation is explicitly disabled
+            var result = JsonSerializer.Deserialize<ValidatedTestObject>(invalidJson, options);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal("x", result.Name);
+            Assert.Equal(-5, result.Age);
+        }
+
+        [Fact]
+        public void Deserialize_WithoutValidation_PerformanceScenario_ShouldSucceed()
+        {
+            // Arrange
+            var invalidJson = """{"Name":"","Age":999}"""; // Empty name, age out of range
+            var options = new JsonSerializerOptions().WithoutValidation();
+
+            // Act - Should succeed for performance-critical scenarios
+            var result = JsonSerializer.Deserialize<ValidatedTestObject>(invalidJson, options);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal("", result.Name);
+            Assert.Equal(999, result.Age);
+        }
+
+        [Fact]
+        public void Deserialize_EnableThenDisableValidation_ShouldRespectLastSetting()
+        {
+            // Arrange
+            var invalidJson = """{"Name":"x","Age":-5}"""; // Name too short, Age negative
+            var options = new JsonSerializerOptions()
+                .WithValidation()      // Enable validation
+                .WithoutValidation();  // Then disable it
+
+            // Act - Should not throw because validation was disabled last
+            var result = JsonSerializer.Deserialize<ValidatedTestObject>(invalidJson, options);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal("x", result.Name);
+            Assert.Equal(-5, result.Age);
+        }
+
+        [Fact]
+        public void Deserialize_DisableThenEnableValidation_ShouldRespectLastSetting()
+        {
+            // Arrange
+            var invalidJson = """{"Name":"x","Age":-5}"""; // Name too short, Age negative
+            var options = new JsonSerializerOptions()
+                .WithoutValidation()   // Disable validation
+                .WithValidation();     // Then enable it
+
+            // Act & Assert - Should throw because validation was enabled last
+            var exception = Assert.Throws<JsonValidationException>(() =>
+                JsonSerializer.Deserialize<ValidatedTestObject>(invalidJson, options));
+            
+            Assert.NotNull(exception.ValidationErrors);
+            Assert.True(exception.ValidationErrors.Count > 0);
+        }
+
+        [Fact]
+        public void Deserialize_WithoutValidation_MultipleCallsShouldBeIdempotent()
+        {
+            // Arrange
+            var invalidJson = """{"Name":"x","Age":-5}"""; // Name too short, Age negative
+            var options = new JsonSerializerOptions()
+                .WithValidation()
+                .WithoutValidation()
+                .WithoutValidation()   // Multiple calls should be safe
+                .WithoutValidation();
+
+            // Act - Should not throw
+            var result = JsonSerializer.Deserialize<ValidatedTestObject>(invalidJson, options);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal("x", result.Name);
+            Assert.Equal(-5, result.Age);
+        }
+
         public class TestObject
         {
             public string Name { get; set; } = string.Empty;
             public int Value { get; set; }
+        }
+
+        public class ValidatedTestObject
+        {
+            [JsonLength(2, 100)]
+            public string Name { get; set; } = string.Empty;
+
+            [JsonRange(0, 120)]
+            public int Age { get; set; }
+        }
+
+        public class ComplexValidatedObject
+        {
+            [JsonLength(2, 100)]
+            public string Name { get; set; } = string.Empty;
+
+            [JsonRange(0, 120)]
+            public int Age { get; set; }
+
+            [JsonPattern(@"^[^@]+@[^@]+\.[^@]+$")]
+            public string Email { get; set; } = string.Empty;
         }
     }
 }

@@ -85,13 +85,13 @@ namespace JsonToolkit.STJ.ValidationAttributes
             // Check minimum constraint
             if (MinimumIsInclusive ? numericValue < Minimum : numericValue <= Minimum)
             {
-                return CreateValidationError(propertyName, propertyPath);
+                return CreateValidationError(propertyName, propertyPath, value, typeof(double));
             }
 
             // Check maximum constraint
             if (MaximumIsInclusive ? numericValue > Maximum : numericValue >= Maximum)
             {
-                return CreateValidationError(propertyName, propertyPath);
+                return CreateValidationError(propertyName, propertyPath, value, typeof(double));
             }
 
             return null; // Validation passed

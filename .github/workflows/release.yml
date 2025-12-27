@@ -12,7 +12,8 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write  # Need write permission to create releases
+  id-token: write  # For OIDC token if using trusted publishing
 
 env:
   PACKAGE_ID: JsonToolkit.STJ
@@ -134,6 +135,77 @@ jobs:
           dotnet nuget push "$sym" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
         done
 
+    - name: Generate Release Notes
+      id: release_notes
+      shell: bash
+      run: |
+        # Create release notes based on commits since last tag
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        if [ -n "$PREVIOUS_TAG" ]; then
+          echo "Generating release notes from $PREVIOUS_TAG to ${{ github.ref_name }}"
+          COMMITS=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
+        else
+          echo "No previous tag found, using recent commits"
+          COMMITS=$(git log --pretty=format:"- %s (%h)" -10)
+        fi
+        
+        # Create release notes
+        cat > release_notes.md << EOF
+        ## 🚀 What's New in v$VERSION
+        
+        This release includes the following changes:
+        
+        ### 📦 Package Information
+        - **Package**: ${{ env.PACKAGE_ID }}
+        - **Version**: $VERSION
+        - **NuGet**: https://www.nuget.org/packages/${{ env.PACKAGE_ID }}/$VERSION
+        
+        ### 🔧 Changes
+        $COMMITS
+        
+        ### 📊 Performance
+        - Maintained high performance with System.Text.Json
+        - Comprehensive testing across multiple .NET versions
+        - Memory efficient with minimal allocations
+        
+        ### 🎯 Framework Support
+        - .NET Framework 4.6.2+
+        - .NET Standard 2.0+
+        - .NET 6.0+
+        - .NET 8.0+
+        - .NET 9.0+
+        
+        ### 📥 Installation
+        \`\`\`bash
+        dotnet add package ${{ env.PACKAGE_ID }} --version $VERSION
+        \`\`\`
+        
+        ### 🔗 Links
+        - [NuGet Package](https://www.nuget.org/packages/${{ env.PACKAGE_ID }}/$VERSION)
+        - [Documentation](https://github.com/${{ github.repository }}#readme)
+        - [Issues](https://github.com/${{ github.repository }}/issues)
+        EOF
+        
+        echo "Release notes created:"
+        cat release_notes.md
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: "JsonToolkit.STJ v${{ env.VERSION }}"
+        body_path: release_notes.md
+        files: |
+          ./artifacts/*.nupkg
+          ./artifacts/*.snupkg
+        draft: false
+        prerelease: ${{ contains(env.VERSION, '-') }}
+        generate_release_notes: true
+        append_body: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
     - name: Release Summary
       shell: bash
@@ -142,4 +214,11 @@ jobs:
         echo "- Package: ${{ env.PACKAGE_ID }}" >> $GITHUB_STEP_SUMMARY
         echo "- Version: $VERSION" >> $GITHUB_STEP_SUMMARY
         echo "- NuGet URL: https://www.nuget.org/packages/${{ env.PACKAGE_ID }}/$VERSION" >> $GITHUB_STEP_SUMMARY
+        echo "- GitHub Release: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
         echo "- Authentication: API Key" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Release Assets" >> $GITHUB_STEP_SUMMARY
+        echo "The following files have been attached to the GitHub release:" >> $GITHUB_STEP_SUMMARY
+        for file in ./artifacts/*; do
+          echo "- $(basename "$file")" >> $GITHUB_STEP_SUMMARY
+        done

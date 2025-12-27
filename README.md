@@ -42,14 +42,20 @@ dotnet add package JsonToolkit.STJ
 using JsonToolkit.STJ;
 using JsonToolkit.STJ.Extensions;
 
+// Enable JsonToolkit.STJ with validation by default (recommended for security)
+var options = new JsonSerializerOptions().EnableJsonToolkit();
+
 // Newtonsoft.Json-style extensions
-var json = myObject.ToJson();
-var obj = json.FromJson<MyType>();
+var json = myObject.ToJson(options);
+var obj = json.FromJson<MyType>(options);
 var cloned = myObject.DeepClone();
 
 // System.Text.Json-style enhanced methods
 var json2 = JsonSerializer.SerializeEnhanced(myObject, options);
 var obj2 = JsonSerializer.DeserializeEnhanced<MyType>(json2, options);
+
+// For performance-critical scenarios, explicitly opt-out of validation
+var fastOptions = new JsonSerializerOptions().EnableJsonToolkit().WithoutValidation();
 ```
 
 ### Deep Merge
@@ -175,9 +181,14 @@ var user = mapper.Transform<UserDto, User>(dto);
 ```csharp
 using JsonToolkit.STJ;
 
-var options = new JsonOptionsBuilder()
+// Recommended: Enable all JsonToolkit.STJ features with validation by default
+var options = new JsonSerializerOptions().EnableJsonToolkit();
+
+// Or configure manually with fluent API
+var customOptions = new JsonOptionsBuilder()
     .WithCaseInsensitiveProperties()
     .WithFlexibleEnums()
+    .WithValidation() // Validation enabled explicitly
     .WithOptionalDefaults(new { timeout = 30, retries = 3 })
     .WithPolymorphicTypes(config => config
         .ForBaseType<Animal>()
@@ -185,6 +196,11 @@ var options = new JsonOptionsBuilder()
         .MapType("dog", typeof(Dog))
         .MapType("cat", typeof(Cat)))
     .Build();
+
+// For performance-critical scenarios, opt-out of validation
+var performanceOptions = new JsonSerializerOptions()
+    .EnableJsonToolkit()
+    .WithoutValidation(); // Explicit opt-out for performance
 
 // Use the configured options
 var json = JsonSerializer.Serialize(myObject, options);
@@ -257,12 +273,17 @@ using JsonToolkit.STJ.Extensions;
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {
+    // Configure JsonToolkit.STJ with validation enabled by default
+    private static readonly JsonSerializerOptions _jsonOptions = 
+        new JsonSerializerOptions().EnableJsonToolkit();
+
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
     {
         try
         {
-            // Validate the request using validation attributes
+            // Validation happens automatically during model binding with EnableJsonToolkit()
+            // Or validate manually if needed
             var validationResult = request.Validate();
             if (!validationResult.IsValid)
             {
@@ -278,11 +299,19 @@ public class UsersController : ControllerBase
 
             // Return response
             var response = new { Id = user.Id, Message = "User created successfully" };
-            return Ok(response.ToJson());
+            return Ok(response.ToJson(_jsonOptions));
         }
         catch (JsonValidationException ex)
         {
-            return BadRequest(new { Error = "Validation failed", Details = ex.Errors });
+            // Enhanced error messages with specific property details
+            return BadRequest(new { 
+                Error = "Validation failed", 
+                Details = ex.ValidationErrors.Select(e => new { 
+                    Property = e.PropertyName, 
+                    Message = e.Message,
+                    Rule = e.ValidationRule 
+                })
+            });
         }
     }
 }
@@ -393,6 +422,10 @@ var shape = json.FromJson<Shape>(options); // Returns Circle instance
 
 #### Validation Attributes
 
+**🔒 Security Note**: Validation is now enabled by default when using `EnableJsonToolkit()` for enhanced security. Use `WithoutValidation()` only in performance-critical scenarios where you trust the input data.
+
+**📝 Validation Attributes**: JsonToolkit.STJ uses its own validation attributes (`[JsonRange]`, `[JsonLength]`, `[JsonPattern]`) which are optimized for JSON scenarios. Standard .NET validation attributes (`[Required]`, `[Range]`) are not automatically processed by JsonToolkit.STJ validation.
+
 ```csharp
 using JsonToolkit.STJ;
 using JsonToolkit.STJ.Extensions;
@@ -410,9 +443,26 @@ public class User
     public string Email { get; set; }
 }
 
-// Validate during deserialization
+// Validation happens automatically with EnableJsonToolkit()
+var options = new JsonSerializerOptions().EnableJsonToolkit();
 var json = """{"name": "John", "age": 30, "email": "john@example.com"}""";
-var user = json.ValidateAndDeserialize<User>(); // Throws JsonValidationException if invalid
+
+try 
+{
+    var user = JsonSerializer.Deserialize<User>(json, options); // Validates automatically
+}
+catch (JsonValidationException ex)
+{
+    // Enhanced error messages with specific property details
+    Console.WriteLine($"Validation failed: {ex.Message}");
+    foreach (var error in ex.ValidationErrors)
+    {
+        Console.WriteLine($"  - {error.PropertyName}: {error.Message}");
+    }
+}
+
+// Legacy explicit validation method (still supported)
+var user2 = json.ValidateAndDeserialize<User>();
 
 // Or validate an existing object
 var existingUser = new User { Name = "John", Age = 30, Email = "john@example.com" };
@@ -424,6 +474,10 @@ if (!validationResult.IsValid)
         Console.WriteLine($"Error: {error.Message}");
     }
 }
+
+// For performance-critical scenarios, explicitly opt-out
+var fastOptions = new JsonSerializerOptions().EnableJsonToolkit().WithoutValidation();
+var userWithoutValidation = JsonSerializer.Deserialize<User>(json, fastOptions);
 ```
 
 ## 🔧 Troubleshooting & Common Issues
@@ -448,19 +502,30 @@ var patch = new JsonPatchDocument()
 
 **Problem**: Validation attributes are ignored during deserialization.
 
-**Solution**: Ensure validation is enabled in your JsonSerializerOptions:
+**Solution**: JsonToolkit.STJ now enables validation by default when using `EnableJsonToolkit()`. For legacy code, ensure validation is explicitly enabled:
 
 ```csharp
+// ✅ Recommended - validation enabled by default
+var options = new JsonSerializerOptions().EnableJsonToolkit();
+var user = JsonSerializer.Deserialize<User>(json, options);
+
+// ✅ Legacy explicit validation
+var options2 = new JsonSerializerOptions().WithValidation();
+var user2 = JsonSerializer.Deserialize<User>(json, options2);
+
+// ✅ Extension method (always validates)
+var user3 = json.ValidateAndDeserialize<User>();
+
 // ❌ Wrong - validation not enabled
-var options = new JsonSerializerOptions();
-var user = JsonSerializer.Deserialize<User>(json, options);
+var options3 = new JsonSerializerOptions();
+var user4 = JsonSerializer.Deserialize<User>(json, options3);
+```
 
-// ✅ Correct - validation enabled
-var options = new JsonSerializerOptions().WithValidation();
-var user = JsonSerializer.Deserialize<User>(json, options);
+**Performance Note**: For performance-critical scenarios where you trust the input data, explicitly opt-out:
 
-// Or use the extension method
-var user = json.ValidateAndDeserialize<User>();
+```csharp
+var fastOptions = new JsonSerializerOptions().EnableJsonToolkit().WithoutValidation();
+var user = JsonSerializer.Deserialize<User>(json, fastOptions);
 ```
 
 ### Performance Optimization
@@ -497,10 +562,15 @@ public string SerializeUser(User user)
 
 ```csharp
 // Configure JsonToolkit.STJ to match Newtonsoft.Json behavior
-var options = new JsonOptionsBuilder()
-    .WithCaseInsensitiveProperties()  // Handle casing differences
-    .WithFlexibleEnums()              // Handle enum string/number flexibility
-    .Build();
+var options = new JsonSerializerOptions()
+    .EnableJsonToolkit()                  // Enables validation, case-insensitive properties, flexible enums
+    .WithNewtonsoftCompatibility();       // Additional Newtonsoft.Json compatibility settings
+
+// For performance-critical scenarios, opt-out of validation if needed
+var performanceOptions = new JsonSerializerOptions()
+    .EnableJsonToolkit()
+    .WithoutValidation()
+    .WithNewtonsoftCompatibility();
 ```
 
 ## 📖 Additional Features

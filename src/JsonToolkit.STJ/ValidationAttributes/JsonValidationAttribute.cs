@@ -37,6 +37,20 @@ namespace JsonToolkit.STJ.ValidationAttributes
         protected abstract string GetDefaultErrorMessage(string propertyName);
 
         /// <summary>
+        /// Creates a ValidationError with the appropriate message and additional context.
+        /// </summary>
+        /// <param name="propertyName">The name of the property being validated.</param>
+        /// <param name="propertyPath">The full path to the property being validated.</param>
+        /// <param name="attemptedValue">The value that failed validation.</param>
+        /// <param name="expectedType">The expected type for the property.</param>
+        /// <returns>A ValidationError instance.</returns>
+        protected ValidationError CreateValidationError(string propertyName, string propertyPath, object? attemptedValue = null, Type? expectedType = null)
+        {
+            var message = ErrorMessage ?? GetDefaultErrorMessage(propertyName);
+            return new ValidationError(propertyPath, message, ErrorType, attemptedValue, expectedType);
+        }
+
+        /// <summary>
         /// Creates a ValidationError with the appropriate message.
         /// </summary>
         /// <param name="propertyName">The name of the property being validated.</param>

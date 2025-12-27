@@ -147,7 +147,16 @@ namespace JsonToolkit.STJ.Converters;
                         var error = validationAttribute.Validate(value, property.Name, propertyPath);
                         if (error != null)
                         {
-                            errors.Add(error);
+                            // Enhance error with additional context
+                            var enhancedError = new ValidationError(
+                                error.PropertyPath,
+                                $"{error.Message} (Attempted value: {FormatAttemptedValue(value)}, Property type: {property.PropertyType.Name})",
+                                error.ErrorType,
+                                value,
+                                property.PropertyType
+                            );
+                            
+                            errors.Add(enhancedError);
                             
                             // Stop at first error if not validating all properties
                             if (!_options.ValidateAllProperties)
@@ -160,12 +169,33 @@ namespace JsonToolkit.STJ.Converters;
                     errors.Add(new ValidationError(
                         property.Name,
                         $"Error accessing property '{property.Name}' for validation: {ex.Message}",
-                        "PropertyAccessError"
+                        "PropertyAccessError",
+                        null,
+                        property.PropertyType
                     ));
                 }
             }
 
             return errors;
+        }
+
+        /// <summary>
+        /// Formats the attempted value for display in error messages.
+        /// </summary>
+        /// <param name="value">The value to format.</param>
+        /// <returns>A formatted string representation of the value.</returns>
+        private static string FormatAttemptedValue(object? value)
+        {
+            if (value == null)
+                return "null";
+            
+            if (value is string stringValue)
+                return $"\"{stringValue}\"";
+            
+            if (value is char charValue)
+                return $"'{charValue}'";
+            
+            return value.ToString() ?? "null";
         }
 
         /// <summary>

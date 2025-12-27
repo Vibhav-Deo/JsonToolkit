@@ -25,8 +25,35 @@ namespace JsonToolkit.STJ
 
             validationOptions ??= ValidationOptions.Enabled();
 
+            // Remove any existing validation converter factory to avoid duplicates
+            var existingFactory = options.Converters.OfType<ValidationConverterFactory>().FirstOrDefault();
+            if (existingFactory != null)
+            {
+                options.Converters.Remove(existingFactory);
+            }
+
             // Add the validation converter factory
             options.Converters.Add(new ValidationConverterFactory(validationOptions));
+
+            return options;
+        }
+
+        /// <summary>
+        /// Explicitly disables automatic validation during deserialization for performance-critical scenarios.
+        /// </summary>
+        /// <param name="options">The JsonSerializerOptions to configure.</param>
+        /// <returns>The configured JsonSerializerOptions for method chaining.</returns>
+        public static JsonSerializerOptions WithoutValidation(this JsonSerializerOptions options)
+        {
+            if (options == null)
+                throw new ArgumentNullException(nameof(options));
+
+            // Remove any existing validation converter factory
+            var existingFactories = options.Converters.OfType<ValidationConverterFactory>().ToList();
+            foreach (var factory in existingFactories)
+            {
+                options.Converters.Remove(factory);
+            }
 
             return options;
         }

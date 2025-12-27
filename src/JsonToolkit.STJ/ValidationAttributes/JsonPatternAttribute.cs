@@ -98,7 +98,7 @@ namespace JsonToolkit.STJ.ValidationAttributes
             {
                 if (!_regex.IsMatch(stringValue))
                 {
-                    return CreateValidationError(propertyName, propertyPath);
+                    return CreateValidationError(propertyName, propertyPath, value, typeof(string));
                 }
             }
             catch (RegexMatchTimeoutException)

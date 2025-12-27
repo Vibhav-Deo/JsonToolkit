@@ -91,13 +91,13 @@ namespace JsonToolkit.STJ.ValidationAttributes
             // Check minimum length constraint
             if (length < MinLength)
             {
-                return CreateValidationError(propertyName, propertyPath);
+                return CreateValidationError(propertyName, propertyPath, value, value.GetType());
             }
 
             // Check maximum length constraint
             if (length > MaxLength)
             {
-                return CreateValidationError(propertyName, propertyPath);
+                return CreateValidationError(propertyName, propertyPath, value, value.GetType());
             }
 
             return null; // Validation passed
